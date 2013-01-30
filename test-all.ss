@@ -1,3 +1,6 @@
+;;; Copyright (c) 2000-2013 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
+;;; See the accompanying file Copyright for detatils
+
 (import (rnrs) (tests compiler-test) (tests helpers) (tests unit-tests) (nanopass helpers))
 (printf "construct-id called ~d times\n" (construct-id-call-count))
 (printf "Running unit tests\n")

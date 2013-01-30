@@ -1,3 +1,6 @@
+;;; Copyright (c) 2000-2013 Andrew W. Keep
+;;; See the accompanying file Copyright for detatils
+
 (library (nanopass language-node-counter)
   (export define-language-node-counter)
   (import (rnrs) (nanopass records) (only (chezscheme) trace-define-syntax))
