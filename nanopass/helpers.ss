@@ -94,12 +94,6 @@
       [(_ obj str1 o2 o3 ...)
        (syntax-violation #f (format str1 o2 o3 ...) obj)]))
 
- ; list-tail is an rnrs function, but for some reason list head is not.
- ; when compiling under Chez we might be better off using Chez's version.
-  (define list-head
-    (lambda (ls n)
-      (if (zero? n) '() (cons (car ls) (list-head (cdr ls) (fx- n 1))))))
-
   (define-syntax with-implicit
     (syntax-rules ()
       [(_ (id name ...) body bodies ...)

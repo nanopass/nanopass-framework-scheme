@@ -222,10 +222,10 @@
                   #,(if (pdesc-trace? pdesc)
                         (let ([maybe-ilang (pass-desc-maybe-ilang pass-desc)]
                               [maybe-olang (pass-desc-maybe-olang pass-desc)])    
-                          (let ([iunparser (and maybe-ilang
+                          (let ([iunparser (and maybe-ilang (pdesc-maybe-itype pdesc)
                                                 (let ([ilang (language-name maybe-ilang)])
                                                   (construct-id ilang "unparse-" ilang)))]
-                                [ounparser (and maybe-olang
+                                [ounparser (and maybe-olang (pdesc-maybe-otype pdesc)
                                                 (let ([olang (language-name maybe-olang)])
                                                   (construct-id olang "unparse-" olang)))])
                             (if iunparser
@@ -400,7 +400,7 @@
                                          (null? dflt*)))])
                                 (genmap (pdesc-name callee-pdesc) level maybe? #`(#,aname #,fml)
                                   (let ([id* (cdr (pdesc-fml* callee-pdesc))]
-                                         [dflt* (pdesc-dflt* callee-pdesc)])
+                                        [dflt* (pdesc-dflt* callee-pdesc)])
                                     (let ([n (fx- (length id*) (length dflt*))])
                                       #`(#,@(list-head id* n)
                                           #,@(map (lambda (id dflt)
@@ -462,7 +462,14 @@
                            ; TODO: terminals should be checked to be matching from the input language
                            ; to the output language, otherwise a check should be made here or the
                            ; checking version of the maker should be used.
-                           #`(#,(pair-alt-maker out-altrec) #,@out-field*))]
+                           ; AWK: this has been changed to use the checking alt, because we cannot
+                           ; assume that other transformers will always create a valid element for
+                           ; sub-parts of this particular maker.
+                           ; TODO: Need to find a way to give a better error message in the checking maker
+                           #`(#,(pair-alt-checking-maker out-altrec)
+                               '#,(pass-desc-name pass-desc)
+                               #,@out-field*
+                               #,@(map (lambda (x) (format "~s" x)) (syntax->datum in-field-name*))))]
                         [(terminal-alt? in-altrec) (error who "unexpected terminal alt" in-altrec)]
                         [(nonterminal-alt? in-altrec) (error who "unexpected nonterminal alt" in-altrec)])))
                   (cond

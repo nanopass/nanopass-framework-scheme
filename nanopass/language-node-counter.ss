@@ -25,7 +25,7 @@
                        (let ([ntspec (nonterminal-alt-ntspec alt)])
                          (loop alt* term* 
                            (cons #`[(#,(ntspec-all-pred ntspec) x)
-                                    (+ 1 (#,(ntspec-unparse-name ntspec) x))]
+                                    (#,(ntspec-unparse-name ntspec) x)]
                              nonterm*)
                            pair*))]
                       [(pair-alt? alt)
@@ -41,21 +41,25 @@
                                (cons 
                                  (let ([fld (car fld*)] [maybe? (car maybe?*)] [acc (car acc*)])
                                    (let ([spec (find-spec fld l)])
-                                     #`(let ([x (#,acc x)])
-                                         #,(let loop ([lvl (car lvl*)] [outer-most? #t])
-                                             (if (fx=? lvl 0)
-                                                 (if (ntspec? spec)
+                                     (if (ntspec? spec)
+                                         #`(let ([x (#,acc x)])
+                                             #,(let loop ([lvl (car lvl*)] [outer-most? #t])
+                                                 (if (fx=? lvl 0)
+                                                     (if maybe?
+                                                         (if outer-most?
+                                                             #`(if x (#,(ntspec-unparse-name spec) x) 0)
+                                                             #`(+ a (if x (#,(ntspec-unparse-name spec) x) 0)))
+                                                         (if outer-most?
+                                                             #`(#,(ntspec-unparse-name spec) x)
+                                                             #`(+ a (#,(ntspec-unparse-name spec) x))))
                                                      (if outer-most?
-                                                         #`(#,(ntspec-unparse-name ntspec) x)
-                                                         #`(+ a (#,(ntspec-unparse-name ntspec) x)))
-                                                     (if outer-most? 1 #`(+ a 1)))
-                                                 (if outer-most?
-                                                     #`(fold-left
-                                                         (lambda (a x) #,(loop (- lvl 1) #f))
-                                                         0 x)
-                                                     #`(fold-left
-                                                         (lambda (a x) #,(loop (- lvl 1) #f))
-                                                         a x)))))))
+                                                         #`(fold-left
+                                                             (lambda (a x) #,(loop (- lvl 1) #f))
+                                                             0 x)
+                                                         #`(fold-left
+                                                             (lambda (a x) #,(loop (- lvl 1) #f))
+                                                             a x)))))
+                                         0)))
                                  rec*))))]
                       [else (syntax-violation 'define-language-node-counter
                               "unrecognized alt ~s" alt)])))))))
