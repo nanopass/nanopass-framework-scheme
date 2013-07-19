@@ -1262,7 +1262,7 @@
             (unless (and (nonterm-id->ntspec? itype (language-ntspecs (pass-desc-maybe-ilang pass-desc)))
                          (nonterm-id->ntspec? maybe-otype (language-ntspecs (pass-desc-maybe-olang pass-desc))))
               (syntax-violation who
-                (format "cannot find a process that accepts input type ~s and outpout type ~s, \
+                (format "cannot find a processor that accepts input type ~s and output type ~s, \
                   and cannot generate one when either the input or output type is a terminal"
                   itype maybe-otype)
                 (pass-desc-name pass-desc) src-stx))
