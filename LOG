@@ -504,3 +504,14 @@ LATEST
   * Fixed (slightly) handling of mapping over input terms.  Now if there is
     not an expression to map, it does not build a call to map.
       nanopass/pass.ss
+2013-08-03
+  * INCOMPATIBLE CHANGE: Extended languages now use the base languages's entry
+    point as the entry point for the language instead of the first listed
+    nonterminal.  In general, this seems like the behavior you want, though it
+    may break some existing libraries, so upgrade with caution.
+      nanopass/languages.ss, tests/compiler.ss
+  * Added a prune-language form that, when given a language, starts traversing
+    the language from the entry nontermainal and determines if there are any
+    dead nonterminals or terminals in the language, prunes them, and returns an
+    S-expression representing only the reachable parts of the language.
+      nanopass/language.ss, nanopass.ss

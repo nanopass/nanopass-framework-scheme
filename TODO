@@ -1,5 +1,9 @@
 TODO
 
+Suggetstions that I should JFD
+
+1. add a way to have languages not autogenerate transformers.
+
 Nanopass Annoyances:
 
 1. Removal of patterns is too strict matching EXACTLY the variable names (see 
@@ -11,12 +15,7 @@ Nanopass Annoyances:
    functions that generate new terms.  The seeds for this exist in the 
    in-context and quasiquote functionality in define-pass.
 
-3. No way to write half transformers on input, i.e. we cannot write our own 
-   parser that takes some input and generates the appropriate language records.
-   The seeds for this exist in the in-context and quasiquote functionality in
-   define-pass.
-
-4. Output forms need to match original language forms very closely, e.g. if we
+3. Output forms need to match original language forms very closely, e.g. if we
    have:
    (define-language L
      over
@@ -41,23 +40,6 @@ Nanopass Annoyances:
           [expr* (reverse (cdr expr*))])
      `(begin ,expr* ... ,last-expr))
 
-5. Cata-morphisms are not currently supported when the transformer function
-   has more then one argument.  Need to re-add support for:
-   [f : a x ... -> b y ...] where f is the transformer from A -> B, a is of
-   the input type A, x ... are additional arguments, b is of the output type
-   B, and y ... are additional returns.
-
-6. Also related to Cata-morphisms, when something like an environment is
-   not being modified, but just passed through should not need to specify it.
-   So, if we have:
-   (Expr : Expr (env) -> Expr
-     [(let ([,x ,[e]] ...) ,[b]) ---]
-     ---)
-   Should be treated as:
-   (Expr : Expr (env) -> Expr
-     [(let ([,x ,[Expr : t1 env -> e]] ...) ,[Expr : t2 env -> b]) ---]
-     ---)
-
 Features to add down the road:
 
 1. Better error reporting in general, currently it is pretty difficult to
@@ -71,58 +53,18 @@ Simplifications to make down the road:
    pieces.  In general make better use of syntax-case's pattern matching
    capabilities so we can write fewer syntax traversals
 
-2. See if there is a way to do something about the final () in most of the
-   define-pass passes.  This is here because it is the "start up" code for the
-   pass, but it is very unclear why () is needed in most cases when there is
-   no start-up code for the pass.  Perhaps we could make this more explicit so
-   we an skip it in the general case.
-
 Error Handling/Loosening restrictions:
 
-1. DONE
-   No error when an unrecognized form is removed in an extended language, e.g.
-   (define-language L1
-     over
-     ---
-     where
-     (e b in Expr
-        ---
-        (letrec ((x0 e0) ...) b)
-        ---)
-     ---)
-
-   (define-language L2 extends L1
-     - (e b in Expr
-          (letrec ((x e) ...) b) ;; Not recognized, not removed, no error
-          ---)
-     ---)
-
-2. Add error for or extend handling of meta-variables for tspecs
-
-3. Add error for or allow extending of meta-varibales for ntspecs, possibly
-   we want to allow for extension as long as they don't conflict with others?
-
-4. Ensure an error is raised if one meta-variable is used to indicate more then
-   one tspec or ntspec.
-
-5. Fix parser to use positional information to report errors on the syntax
+1. Fix parser to use positional information to report errors on the syntax
    error, in addition to reporting the error.
 
 General Clean-up:
 
-1. Finish replacing the syntax, meta-records, syntax with just a set of
-   meta-records.
-
-2. Meta-parser needs to be rewritten so that it does not create a lambda form
+1. MAYBE WE DON'T WANT TO DO THIS
+   Meta-parser needs to be rewritten so that it does not create a lambda form
    when the language is created. (i.e. we need to create a matching machine
    that can be used with a little "byte code" to quickly perform matching
    at compile time.)
-
-3. Meta-parser should allow things of the form: `(primapp car <yada>) instead
-   of requiring `(primapp ,'car <yada>)
-
-4. Fix parser to properly handle binding forms that introduce no bindings like
-   (lambda () 1) and (let () 5) (which currently parse as 1 and 5 respectively)
 
 Compatibility with other systems:
 

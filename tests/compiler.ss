@@ -592,6 +592,7 @@
                 ,(Expr body2 direct)))))]))
 
   (define-language L10 (extends L9)
+    (entry LetrecExpr)
     (LetrecExpr (lrexpr) (+ (letrec ((x lexpr) ...) e)))
     (Expr (e body)
       (- (letrec ((x lexpr) ...) c-letrec))
