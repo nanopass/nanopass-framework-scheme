@@ -640,7 +640,7 @@
                                  #`(lambda (x)
                                      (unless (pred? x)
                                        (errorf who
-                                         "expected ~s but recieved ~s in field ~s of ~s~:[~; from ~:*~a~]"
+                                         "expected ~s but received ~s in field ~s of ~s~:[~; from ~:*~a~]"
                                          '#,name x '#,fld '#,(alt-syn alt) #,msg)))
                                  #`(lambda (x)
                                      (for-each #,(f (fx- level 1)) x))))
