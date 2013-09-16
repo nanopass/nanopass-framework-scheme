@@ -515,3 +515,8 @@ LATEST
     dead nonterminals or terminals in the language, prunes them, and returns an
     S-expression representing only the reachable parts of the language.
       nanopass/language.ss, nanopass.ss
+2013-09-16
+  * Fixed a bug with the parser that caused bare boolean terminals to fail to
+    parse.  Specifically, since #f was used to indicate a failed parse,
+    parsing the bare boolean #f was raising an error.
+      nanopass/parse.ss, tests/unit-tests.ss
