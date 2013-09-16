@@ -57,6 +57,27 @@
       (primapp pr e1 ...)                          => (pr e1 ...)
       (app e0 e1 ...)                              => (e0 e1 ...)))
 
+  (define-language LBool
+    (terminals
+      (boolean (b)))
+    (Expr (e)
+      b))
+
+  (define-language LBoolLambda
+    (terminals
+      (boolean (b))
+      (symbol (x)))
+    (Expr (e)
+      v
+      x
+      (lambda (x) e)
+      (and e0 e1)
+      (or e0 e1)
+      (not e)
+      (e0 e1))
+    (Value (v)
+      b))
+
   (test-suite unit-tests
     (test with-output-language
       (assert-equal?
@@ -209,7 +230,44 @@
                              (app (var ,f.7)
                                   (primapp - (var ,x.4) (quoted 1)))))))
                  (app (var ,f.7) (quoted 10)))) #f)))
-      ))
+      )
+
+    (test boolean-terminals
+      (let ()
+        (define-parser parse-LBool LBool)
+        (assert-equal? #t (parse-LBool #t)))
+      (let ()
+        (define-parser parse-LBool LBool)
+        (assert-equal? #f (parse-LBool #f)))
+      (let ()
+        (define-parser parse-LBool LBool)
+        (guard (c [else #t])
+          (assert-equal? 'a (parse-LBool 'a))))
+      (let ()
+        (define-parser parse-LBoolLambda LBoolLambda)
+        (assert-equal? #t (parse-LBoolLambda #t)))
+      (let ()
+        (define-parser parse-LBoolLambda LBoolLambda)
+        (assert-equal? #f (parse-LBoolLambda #f)))
+      (let ()
+        (define-parser parse-LBoolLambda LBoolLambda)
+        (assert-equal? 
+          '(lambda (x) #f) 
+          (unparse-LBoolLambda
+            (parse-LBoolLambda '(lambda (x) #f)))))
+      (let ()
+        (define-parser parse-LBoolLambda LBoolLambda)
+        (assert-equal? 
+          '(lambda (f) (f #f)) 
+          (unparse-LBoolLambda
+            (parse-LBoolLambda '(lambda (f) (f #f))))))
+      (let ()
+        (define-parser parse-LBoolLambda LBoolLambda)
+        (assert-equal? 
+          '(lambda (f) (not (f #f)))
+          (unparse-LBoolLambda
+            (parse-LBoolLambda '(lambda (f) (not (f #f)))))))))
+
 
    (define datum?
      (lambda (x)

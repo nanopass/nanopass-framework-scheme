@@ -1,6 +1,6 @@
 ;;; Copyright (c) 2000-2013 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for detatils
-
+#!chezscheme
 (library (nanopass parser)
   (export define-parser trace-define-parser)
   (import (rnrs)
@@ -9,6 +9,17 @@
           (nanopass syntaxconvert)
           (nanopass nano-syntax-dispatch)
           (only (chezscheme) trace-define trace-lambda))
+
+  (define np-parse-fail-token '#{np-parse-fail-token dlkcd4b37swscag1dvmuiz-13})
+
+  (define-syntax parse-or
+    (syntax-rules (on-error)
+      [(_ (on-error ?err0)) ?err0]
+      [(_ (on-error ?err0) ?e0 . ?e1)
+       (let ([t0 ?e0])
+         (if (eq? t0 np-parse-fail-token)
+             (parse-or (on-error ?err0) . ?e1)
+             t0))]))
 
   (define-syntax define-parser
     (syntax-rules ()
@@ -34,7 +45,7 @@
                             (if maybe? #`(and #,x (proc-name #,x #t))  #`(proc-name #,x #t))
                             #`(map (lambda (x) #,(f (- level 1) #'x)) #,x)))))]
                 [else (syntax-violation 'parser "unrecognized meta variable"
-                        (language-name desc) m)]))) 
+                        (language-name desc) m)])))
 
           (define-who make-term-clause
             (lambda (alt)
@@ -85,20 +96,22 @@
             (partition-syn nonterm-alt*
               ([nonterm-imp-alt* (lambda (alt) (has-implicit-alt?  (nonterminal-alt-ntspec alt)))]
                 [nonterm-nonimp-alt* otherwise])
-              #`(lambda (s-exp error?)
-                  (or #,@(map make-nonterm-clause nonterm-nonimp-alt*)
-                      (if (pair? s-exp)
-                          (cond
-                            #,@(map make-pair-clause pair-alt*)
-                            #,@(map make-pair-clause pair-imp-alt*)
-                            [else #f])
-                          (cond
-                            #,@(map make-term-clause term-alt*)
-                            [else #f]))
-                      #,@(map make-nonterm-clause nonterm-imp-alt*)
-                      (and error? (error who
-                                    (format "invalid syntax ~s" 
-                                      s-exp)))))))))
+              #`(lambda (s-exp at-top-parse?)
+                  (parse-or
+                    (on-error
+                      (if at-top-parse?
+                          (error who (format "invalid syntax ~s" s-exp))
+                          np-parse-fail-token))
+                    #,@(map make-nonterm-clause nonterm-nonimp-alt*)
+                    (if (pair? s-exp)
+                        (cond
+                          #,@(map make-pair-clause pair-alt*)
+                          #,@(map make-pair-clause pair-imp-alt*)
+                          [else np-parse-fail-token])
+                        (cond
+                          #,@(map make-term-clause term-alt*)
+                          [else np-parse-fail-token]))
+                    #,@(map make-nonterm-clause nonterm-imp-alt*)))))))
 
       (define make-parser
         (lambda (parser-name lang trace?)
