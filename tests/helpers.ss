@@ -254,11 +254,6 @@
       (or (null? ls)
           (and (not (memq (car ls) (cdr ls))) (set? (cdr ls)))))) 
   
-  (define iota
-    (case-lambda
-      [(n) (iota 0 n)]
-      [(i n) (if (= n 0) '() (cons i (iota (+ i 1) (- n 1))))])) 
-  
   ;;; ====================
   ;;; Extra syntax and helpers for multiple values 
   

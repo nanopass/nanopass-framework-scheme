@@ -466,7 +466,7 @@
                            ; assume that other transformers will always create a valid element for
                            ; sub-parts of this particular maker.
                            ; TODO: Need to find a way to give a better error message in the checking maker
-                           #`(#,(pair-alt-checking-maker out-altrec)
+                           #`(#,(pair-alt-maker out-altrec)
                                '#,(pass-desc-name pass-desc)
                                #,@out-field*
                                #,@(map (lambda (x) (format "~s" x)) (syntax->datum in-field-name*))))]
@@ -504,105 +504,105 @@
                                    '#,(pdesc-name pdesc))
                                  #,fml))))])))
 
-            (define gen-binding (lambda (t v) (if (eq? t v) '() #`((#,t #,v)))))
-            (define gen-t (lambda (acc) (if (identifier? acc) acc (gentemp))))
-            (define gen-let1
-              (lambda (t v e)
-                (cond [(eq? t v) e]
-                  [(eq? e #t) #t]
-                  [else #`(let ([#,t #,v]) #,e)])))
-            ;; Note: gen-and DOES NOT actually function like and. For instance,
-            ;; normally (and exp #t) would return #t, but with gen-and we get exp
-            ;; so if exp does not evaluate to #t, the result is different.
-            ;; This is used in the generated results.
-            (define gen-and
-              (lambda (e1 e2)
-                (cond [(eq? e1 #t) e2] [(eq? e2 #t) e1] [else #`(and #,e1 #,e2)])))
-            (define gen-for-all
-              (lambda (t v e)
-                (if (eq? e #t) #t #`(for-all (lambda (#,t) #,e) #,v))))
+              (define gen-binding (lambda (t v) (if (eq? t v) '() #`((#,t #,v)))))
+              (define gen-t (lambda (acc) (if (identifier? acc) acc (gentemp))))
+              (define gen-let1
+                (lambda (t v e)
+                  (cond [(eq? t v) e]
+                    [(eq? e #t) #t]
+                    [else #`(let ([#,t #,v]) #,e)])))
+              ;; Note: gen-and DOES NOT actually function like and. For instance,
+              ;; normally (and exp #t) would return #t, but with gen-and we get exp
+              ;; so if exp does not evaluate to #t, the result is different.
+              ;; This is used in the generated results.
+              (define gen-and
+                (lambda (e1 e2)
+                  (cond [(eq? e1 #t) e2] [(eq? e2 #t) e1] [else #`(and #,e1 #,e2)])))
+              (define gen-for-all
+                (lambda (t v e)
+                  (if (eq? e #t) #t #`(for-all (lambda (#,t) #,e) #,v))))
 
-            ; TODO: Right now process-nano-fields and its helpers are generating a predicate
-            ; on incoming records, and two bindings for each user specified unquote expression.
-            ; I think the infrastructure should be assuming that the input is well structured
-            ; (i.e. it should rely on the builder of the structure to do the checking and not
-            ; check on input, and hence should not generate the temporary bindings, or the
-            ; checks.)
-            (define process-nano-fields
-              (lambda (elt* acc-id aname* itype*)
-                (if (null? elt*)
-                    (values #t '() '() '())
-                    (let-values
-                      ([(elt-ipred elt-tbinding* elt-ibinding* elt-obinding*)
-                        (process-nano-elt (car elt*) #`(#,(car aname*) #,acc-id)
-                          (car itype*))]
-                       [(rest-ipred rest-tbinding* rest-ibinding* rest-obinding*)
-                        (process-nano-fields (cdr elt*) acc-id (cdr aname*)
-                          (cdr itype*))])
-                      (values
-                        (gen-and elt-ipred rest-ipred)
-                        (append elt-tbinding* rest-tbinding*)
-                        (append elt-ibinding* rest-ibinding*)
-                        (append elt-obinding* rest-obinding*))))))
+              ; TODO: Right now process-nano-fields and its helpers are generating a predicate
+              ; on incoming records, and two bindings for each user specified unquote expression.
+              ; I think the infrastructure should be assuming that the input is well structured
+              ; (i.e. it should rely on the builder of the structure to do the checking and not
+              ; check on input, and hence should not generate the temporary bindings, or the
+              ; checks.)
+              (define process-nano-fields
+                (lambda (elt* acc-id aname* itype*)
+                  (if (null? elt*)
+                      (values #t '() '() '())
+                      (let-values
+                        ([(elt-ipred elt-tbinding* elt-ibinding* elt-obinding*)
+                          (process-nano-elt (car elt*) #`(#,(car aname*) #,acc-id)
+                            (car itype*))]
+                         [(rest-ipred rest-tbinding* rest-ibinding* rest-obinding*)
+                          (process-nano-fields (cdr elt*) acc-id (cdr aname*)
+                            (cdr itype*))])
+                        (values
+                          (gen-and elt-ipred rest-ipred)
+                          (append elt-tbinding* rest-tbinding*)
+                          (append elt-ibinding* rest-ibinding*)
+                          (append elt-obinding* rest-obinding*))))))
 
-            (define gen-mvmap
-              (lambda (who ids proc arg . args)
-                (with-syntax ([who who] [proc proc] [arg arg])
-                  (with-syntax ([(arg* ...) args]
-                                [(ls2 ...) (generate-temporaries args)]
-                                [(id ...) (generate-temporaries ids)]
-                                [(id* ...) (generate-temporaries ids)])
-                    (with-syntax ([(ls ...) #'(ls1 ls2 ...)])
-                      #'(let ([p proc] [ls1 arg] [ls2 arg*] ...)
-                          (unless (list? ls) (error 'who "not a proper list" ls))
-                          ...
-                          (let ([n (length ls1)])
-                            (unless (and (= (length ls2) n) ...)
-                              (error 'who "mismatched list lengths" ls1 ls2 ...)))
-                          (let f ([ls1 ls1] [ls2 ls2] ...)
-                            (if (null? ls1)
-                                (let ([id '()] ...) (values id ...))
-                                (let-values ([(id ...) (p (car ls1) (car ls2) ...)]
-                                             [(id* ...) (f (cdr ls1) (cdr ls2) ...)])
-                                  (values (cons id id*) ...))))))))))
+              (define gen-mvmap
+                (lambda (who ids proc arg . args)
+                  (with-syntax ([who who] [proc proc] [arg arg])
+                    (with-syntax ([(arg* ...) args]
+                                  [(ls2 ...) (generate-temporaries args)]
+                                  [(id ...) (generate-temporaries ids)]
+                                  [(id* ...) (generate-temporaries ids)])
+                      (with-syntax ([(ls ...) #'(ls1 ls2 ...)])
+                        #'(let ([p proc] [ls1 arg] [ls2 arg*] ...)
+                            (unless (list? ls) (error 'who "not a proper list" ls))
+                            ...
+                            (let ([n (length ls1)])
+                              (unless (and (= (length ls2) n) ...)
+                                (error 'who "mismatched list lengths" ls1 ls2 ...)))
+                            (let f ([ls1 ls1] [ls2 ls2] ...)
+                              (if (null? ls1)
+                                  (let ([id '()] ...) (values id ...))
+                                  (let-values ([(id ...) (p (car ls1) (car ls2) ...)]
+                                                [(id* ...) (f (cdr ls1) (cdr ls2) ...)])
+                                    (values (cons id id*) ...))))))))))
 
-            (define process-nano-dots
-              (lambda (elt acc itype)
-                (let ([map-t (gentemp)])
-                  (let-values ([(ipred tbinding* ibinding* obinding*)
-                                (process-nano-elt elt map-t itype)])
-                    (let ([ls-t (gen-t acc)])
-                      (values
-                        (gen-for-all map-t acc ipred)
-                        (gen-binding ls-t acc)
-                        (map
-                          (lambda (ibinding)
-                            (syntax-case ibinding ()
-                              [(id expr)
-                               (if (and (identifier? #'expr) (eq? map-t #'expr))
-                                   #`(id #,ls-t)
-                                   #`(id (map (lambda (#,map-t)
-                                                #,(if (null? tbinding*) 
-                                                      #'expr
-                                                      #`(let* #,tbinding* expr)))
-                                           #,ls-t)))]))
-                          ibinding*)
-                        (map
-                          (lambda (obinding)
-                            ;; TODO: rather than tearing apart the code we've constructed
-                            ;; in the nano-cata case to support dotted cata, the nano-cata
-                            ;; should be constructed to just build the correct code in the first
-                            ;; place.
-                            (syntax-case obinding ()
-                              [(ids (procexpr var args ...)) ;; contains expr itself
-                               #`(ids ((let ([p (let ([p procexpr]) (lambda (m) (p m args ...)))])
-                                         (lambda (x)
-                                           #,(cond
-                                               [(null? #'ids) #'(begin (for-each p x) (values))]
-                                               [(null? (cdr #'ids)) #'(map p x)]
-                                               [else (gen-mvmap (pass-desc-name pass-desc)
-                                                       #'ids #'p #'x)])))
-                                       var))]))
+              (define process-nano-dots
+                (lambda (elt acc itype)
+                  (let ([map-t (gentemp)])
+                    (let-values ([(ipred tbinding* ibinding* obinding*)
+                                  (process-nano-elt elt map-t itype)])
+                      (let ([ls-t (gen-t acc)])
+                        (values
+                          (gen-for-all map-t acc ipred)
+                          (gen-binding ls-t acc)
+                          (map
+                            (lambda (ibinding)
+                              (syntax-case ibinding ()
+                                [(id expr)
+                                  (if (and (identifier? #'expr) (eq? map-t #'expr))
+                                      #`(id #,ls-t)
+                                      #`(id (map (lambda (#,map-t)
+                                                   #,(if (null? tbinding*) 
+                                                         #'expr
+                                                         #`(let* #,tbinding* expr)))
+                                              #,ls-t)))]))
+                            ibinding*)
+                          (map
+                            (lambda (obinding)
+                              ;; TODO: rather than tearing apart the code we've constructed
+                              ;; in the nano-cata case to support dotted cata, the nano-cata
+                              ;; should be constructed to just build the correct code in the first
+                              ;; place.
+                              (syntax-case obinding ()
+                                [(ids (procexpr var args ...)) ;; contains expr itself
+                                  #`(ids ((let ([p (let ([p procexpr]) (lambda (m) (p m args ...)))])
+                                            (lambda (x)
+                                              #,(cond
+                                                  [(null? #'ids) #'(begin (for-each p x) (values))]
+                                                  [(null? (cdr #'ids)) #'(map p x)]
+                                                  [else (gen-mvmap (pass-desc-name pass-desc)
+                                                          #'ids #'p #'x)])))
+                                           var))]))
                             obinding*)))))))
 
               (define process-nano-list
@@ -663,6 +663,37 @@
                         (append (gen-binding t acc) tbinding*)
                         ibinding* obinding*)))))
 
+              (define build-meta-variable-check
+                (lambda (id acc itype)
+                  (let ([spec (find-spec id ilang)])
+                    ;; SYMBOLIC
+                    (cond
+                      [(eq? (syntax->datum (spec-type spec)) (syntax->datum itype)) #t]
+                      [(nonterm-id->ntspec? itype (language-ntspecs ilang)) =>
+                       (lambda (ntspec)
+                         (if (subspec? spec ntspec)
+                             #`(#,(spec-all-pred spec) #,acc)
+                             (syntax-violation
+                               (syntax->datum (pass-desc-name pass-desc))
+                               (format
+                                 "expected meta-variable for nonterminal ~s, but got"
+                                 (syntax->datum itype))
+                               id)))]
+                      [(term-id->tspec? itype (language-ntspecs ilang)) =>
+                       (lambda (tspec)
+                         (syntax-violation
+                           (syntax->datum (pass-desc-name pass-desc))
+                           (format
+                             "expected meta-variable for terminal ~s, but got"
+                             (syntax->datum itype))
+                           id))]
+                      [else (syntax-violation
+                              (syntax->datum (pass-desc-name pass-desc))
+                              (format
+                                "NANOPASS INTERNAL ERROR: unable to find spec for type ~s"
+                                (syntax->datum itype))
+                              id)]))))
+
               (define process-nano-elt
                 (lambda (elt acc itype)
                   (cond
@@ -672,7 +703,7 @@
                                      (process-nano-meta elt t)])
                          (values
                            (gen-let1 t acc
-                             (gen-and 
+                             (gen-and
                                ;; TODO: if the nt here doesn't have any terminals, then we only
                                ;; need to do the tag comparison.
                                #;#`(eqv? (nanopass-record-tag #,t) #,(pair-alt-tag (nano-meta-alt elt)))
@@ -680,16 +711,15 @@
                                ipred))
                            (append (gen-binding t acc) tbinding*)
                            ibinding* obinding*)))]
-                    [(nano-quote? elt) (error 'process-nano-elt "(pass.ss) nano-quote not supported" elt)]
+                    [(nano-quote? elt) 
+                     (syntax-violation (syntax->datum (pass-desc-name pass-desc))
+                       "quoted items are currently unsupported in patterns"
+                       (nano-quote-x elt))]
                     [(nano-unquote? elt)
                      ; TODO: will break if two ids are same
                      (let ([id (nano-unquote-x elt)])
                        (values
-                         (let ([spec (find-spec id ilang)])
-                           ;; SYMBOLIC
-                           (if (eq? (syntax->datum (spec-type spec)) (syntax->datum itype))
-                               #t
-                               #`(#,(spec-all-pred spec) #,acc)))
+                         (build-meta-variable-check id acc itype)
                          '()
                          (list #`(#,id #,acc))
                          '()))]
@@ -812,16 +842,8 @@
                            (values
                              ; input predicate check
                              (if maybe-inid*
-                                 (let ([spec (find-spec (car maybe-inid*) ilang)])
-                                   ; TODO: this was copied from the old nano-cata? code, but looks
-                                   ; suspicious investigate what itype is here and when we should and
-                                   ; shouldn't be making a check (Also, this is quite possibly where we
-                                   ; should be complaining if the input meta variable doesn't match what
-                                   ; is expected (also highly suspect, as itype is the output
-                                   ; type for this cata expression)
-                                   (if (eq? (syntax->datum (spec-type spec)) (syntax->datum itype))
-                                       #t
-                                       #`(#,(spec-all-pred spec) #,acc)))
+                                 (build-meta-variable-check (car maybe-inid*)
+                                   acc (nano-cata-itype elt))
                                  #t)
                              ; binding of temporaries
                              '()
@@ -969,23 +991,23 @@
                 (lambda (alt pclause* else-id)
                   (let f ([pclause* pclause*])
                     (if (null? pclause*)
-                        (if else-id
-                            #`(#,else-id)
-                            (if maybe-olang
-                                (if maybe-otype
-                                    (make-system-clause alt)
-                                    (syntax-violation (syntax->datum (pass-desc-name pass-desc))
-                                      (format "missing ~s clause cannot be generated with no output type"
-                                        (syntax->datum (alt-syn alt)))
-                                      (pdesc-name pdesc)))
-                                (if (nonterminal-alt? alt)
-                                    (build-subtype-call (syntax->datum (ntspec-name (nonterminal-alt-ntspec alt)))) ; HERE
-                                    ; Process a terminal alt here?
-                                    ; (seems weird that this would not lead to error)
-                                    (syntax-violation (syntax->datum (pass-desc-name pass-desc))
-                                      (format "missing ~s clause cannot be generated with no output type"
-                                        (syntax->datum (alt-syn alt)))
-                                      (pdesc-name pdesc)))))
+                        (cond
+                          [else-id #`(#,else-id)]
+                          ; TODO: Consider dropping the (not maybe-olang) and
+                          ; building the subtype call even if there is no otype
+                          ; for this.  (Need to make sure build-subtype-call
+                          ; can handle this appropriately (possibly also need
+                          ; to decide if a user-supplied sub-type call with an
+                          ; output type is okay to call).)
+                          [(and (or (and maybe-olang maybe-otype) (not maybe-olang)) (nonterminal-alt? alt))
+                           (build-subtype-call (syntax->datum (ntspec-name (nonterminal-alt-ntspec alt))))]
+                          [(and maybe-olang maybe-otype)
+                           (make-system-clause alt)]
+                          [else
+                           (syntax-violation (syntax->datum (pass-desc-name pass-desc))
+                             (format "missing ~s clause cannot be generated with no output type"
+                               (syntax->datum (alt-syn alt)))
+                             (pdesc-name pdesc))])
                         (let ([pclause (car pclause*)] [pclause* (cdr pclause*)])
                           (pclause-used-set! pclause #t)
                           (make-user-clause pclause (lambda () (f pclause*)))))))))

@@ -10,7 +10,7 @@
   
   (define make-unparser
     (lambda (desc)
-      (let* ([lang-name (language-record desc)]
+      (let* ([lang-name (language-name desc)]
              [ntspecs (language-ntspecs desc)]
              [tspecs (language-tspecs desc)])
         (with-syntax ([(proc-name ...) (map ntspec-unparse-name ntspecs)]
@@ -18,8 +18,8 @@
                       [(tspec? ...) (map tspec-pred tspecs)])
           (with-syntax ([(proc ...)
                          (map (lambda (ntspec procname)
-                                (make-unparse-proc tspecs ntspecs ntspec 
-                                                   procname lang-name))
+                                (make-unparse-proc
+                                  tspecs ntspecs ntspec procname))
                               ntspecs #'(proc-name ...))])
             #`(rec f (case-lambda
                        [(ir) (f ir #f)]
@@ -34,7 +34,7 @@
                                   ir)])])))))))
   
   (define make-unparse-proc
-    (lambda (tspecs ntspecs ntspec procname lang-name)
+    (lambda (tspecs ntspecs ntspec procname)
       ;; handles alts of the form: LambdaExpr where LambdaExpr is another
       ;; non-terminal specifier with no surrounding markers.
       (define make-nonterm-clause
@@ -64,7 +64,6 @@
             (let ([names (syntax->datum (pair-alt-field-names alt))])
               (lambda (m)
                 (and (identifier? m) (memq (syntax->datum m) names) #t))))
-
           (define lookup-meta-info
             (let ([meta-map (map list
                               (pair-alt-field-names alt)
@@ -78,9 +77,8 @@
                         "unable to find match for ~s in ~s"
                         (syntax->datum name)
                         (syntax->datum (pair-alt-field-names alt))))))))
-
           (define unparse-field
-            (lambda (m) 
+            (lambda (m)
               (let-values ([(m level maybe? accr) (lookup-meta-info m)])
                 (cond
                   [(meta-name->tspec m tspecs) =>
@@ -104,11 +102,8 @@
                        (let f ([level level] [x #'field])
                          (if (= level 0)
                              (if maybe? #`(and #,x (proc-name #,x)) #`(proc-name #,x))
-                             #`(map (lambda (x) #,(f (- level 1) #'x))
-                                    #,x)))))]
-                  [else (error 'parse-field "unrecognized meta variable ~s"
-                               m)]))))
-
+                             #`(map (lambda (x) #,(f (- level 1) #'x)) #,x)))))]
+                  [else (error 'parse-field "unrecognized meta variable ~s" m)]))))
           (define-syntax syntax-lambda
             (lambda (x)
               (syntax-case x ()
@@ -117,13 +112,11 @@
                    #'(lambda (x ...)
                        (with-syntax ((pat x) ...)
                          b b* ...)))])))
-
           (define-syntax with-temp
             (syntax-rules ()
               [(_ v b b* ...)
                (with-syntax ([(v) (generate-temporaries '(x))])
                  b b* ...)]))
-
           (define destruct
             (lambda (x)
               (syntax-case x ()
@@ -183,35 +176,34 @@
                                    (append #'a-vars #'d-vars)
                                    (append #'a-exps #'d-exps)))))))]
                 [other (values #'other '() '())])))
-          (with-syntax ([pred? (pair-alt-pred alt)])
-            #`((pred? ir) 
-               #,(with-values (destruct (alt-syn alt))
-                   (syntax-lambda (builder (x ...) (exp ...))
-                     (let ([pretty (alt-pretty alt)])
-                       (if pretty
-                           (with-values (destruct pretty)
-                             (syntax-lambda (pbuilder (px ...) (pexp ...))
-                               #'(if raw?
-                                     (let ((x exp) ...) builder)
-                                     (let ((px pexp) ...) pbuilder))))
-                           #'(let ((x exp) ...) builder)))))))))
+          #`((#,(pair-alt-pred alt) ir)
+              #,(with-values (destruct (alt-syn alt))
+                  (syntax-lambda (builder (x ...) (exp ...))
+                    (let ([pretty (alt-pretty alt)])
+                      (if pretty
+                          (with-values (destruct pretty)
+                            (syntax-lambda (pbuilder (px ...) (pexp ...))
+                              #'(if raw?
+                                    (let ((x exp) ...) builder)
+                                    (let ((px pexp) ...) pbuilder))))
+                          #'(let ((x exp) ...) builder))))))))
 
-      ;; When one nonterminalA alternative is another nonterminalB, we
-      ;; expand all the alternatives of nonterminalB with the alternatives
-      ;; of nonterminalA However, nonterminalA and nonterminalB cannot
-      ;; (both) have an implicit case, by design.
-      (partition-syn (ntspec-alts ntspec)
-        ([term-alt* terminal-alt?] [nonterm-alt* nonterminal-alt?] [pair-alt* otherwise])
-        (partition-syn nonterm-alt*
-          ([nonterm-imp-alt* (lambda (alt)
-                               (has-implicit-alt?
-                                 (nonterminal-alt-ntspec alt)))]
-           [nonterm-nonimp-alt* otherwise])
-          #`(lambda (ir)
-              (cond
-                #,@(map make-term-clause term-alt*)
-                #,@(map make-pair-clause pair-alt*)
-                ;; note: the following two can potentially be combined
-                #,@(apply append (map make-nonterm-clause nonterm-nonimp-alt*))
-                #,@(apply append (map make-nonterm-clause nonterm-imp-alt*))
-                [else (error '#,procname "invalid record" ir)])))))))
+    ;; When one nonterminalA alternative is another nonterminalB, we
+    ;; expand all the alternatives of nonterminalB with the alternatives
+    ;; of nonterminalA However, nonterminalA and nonterminalB cannot
+    ;; (both) have an implicit case, by design.
+    (partition-syn (ntspec-alts ntspec)
+      ([term-alt* terminal-alt?] [nonterm-alt* nonterminal-alt?] [pair-alt* otherwise])
+      (partition-syn nonterm-alt*
+        ([nonterm-imp-alt* (lambda (alt)
+                             (has-implicit-alt?
+                               (nonterminal-alt-ntspec alt)))]
+          [nonterm-nonimp-alt* otherwise])
+        #`(lambda (ir)
+            (cond
+              #,@(map make-term-clause term-alt*)
+              #,@(map make-pair-clause pair-alt*)
+              ;; note: the following two can potentially be combined
+              #,@(apply append (map make-nonterm-clause nonterm-nonimp-alt*))
+              #,@(apply append (map make-nonterm-clause nonterm-imp-alt*))
+              [else (error '#,procname "invalid record" ir)])))))))

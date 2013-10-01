@@ -363,15 +363,9 @@
               (if (and handler? (alt-pretty a))
                   #`(=> #,(alt-syn a) #,(alt-pretty a))
                   (alt-syn a))))
-          (define ntspec->ntspec-name
-            (lambda (p)
-              (let ([id (ntspec-nongenerative-id p)])
-                (if id
-                    #`(#,(ntspec-name p) #,id)
-                    (ntspec-name p)))))
           (define ntspec->s-expression
             (lambda (p)
-              #`(#,(ntspec->ntspec-name p) #,(ntspec-meta-vars p)
+              #`(#,(ntspec-name p) #,(ntspec-meta-vars p)
                  #,@(map alt->s-expression (ntspec-alts p)))))
           (lambda (env)
             (let ([lang (env lang)])

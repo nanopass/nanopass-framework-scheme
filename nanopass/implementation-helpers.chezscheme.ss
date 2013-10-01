@@ -11,7 +11,7 @@
           indirect-export syntax->annotation
           annotation-source source-object-bfp source-object-sfd source-file-descriptor-path
           scheme-version= scheme-version< scheme-version> scheme-version>= scheme-version<=
-          with-scheme-version)
+          with-scheme-version make-list iota)
   (import (chezscheme))
 
   (define-syntax define-scheme-version-relop

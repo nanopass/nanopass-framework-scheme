@@ -82,7 +82,7 @@
     (test unparse-language
       (assert-equal?
         `(quoted 5)
-        (unparse-LUNPARSE 
+        (unparse-LUNPARSE
           (with-output-language (LUNPARSE Expr) `(quoted 5))
           #t))
 
@@ -150,7 +150,7 @@
 
       (assert-equal?
         '(quote 5)
-        (unparse-LUNPARSE 
+        (unparse-LUNPARSE
           (with-output-language (LUNPARSE Expr) `(quoted 5))
           #f))
 
@@ -453,7 +453,7 @@
          (define-pass add-one-int : Lmaybe2 (ir) ->  Lmaybe2 ()
            (Exp : Exp (ir) -> Exp ()
              [(Int ,i) `(Int ,(fx+ i 1))]))
-         (and 
+         (and
            (assert-equal?
              '(Int 4)
              (unparse-Lmaybe2 (add-one-int (with-output-language (Lmaybe2 Exp) `(Int 3)))))
@@ -491,7 +491,7 @@
           (assert-equal?
              '(Foo 4 (Bar #f (Foo 7 #f)) (Bool #t) #f)
              (unparse-Lmaybe2 (add-one (with-output-language (Lmaybe2 Exp) `(Foo 3 (Bar #f (Foo 6 #f)) (Bool #t) #f)))))))))
-   
+
    (define-language LMULTI
      (terminals
        (var (x))

@@ -17,20 +17,20 @@
 
   (define make-meta-parser
     (lambda (desc)
-      (let ([lang-name (language-record desc)]
+      (let ([lang-name (language-name desc)]
             [ntspec* (language-ntspecs desc)]
             [tspec* (language-tspecs desc)])
         (with-syntax ([cata? (gentemp)])
           (with-syntax ([(ntspec-id ...) (map ntspec-name ntspec*)]
                         [(term-pred-defn ...)
                          (map (lambda (tspec)
-                                (make-meta-pred-defn lang-name
+                                (make-meta-pred-defn
                                   (tspec-meta-pred tspec)
                                   (tspec-meta-vars tspec)))
                            tspec*)]
                         [(nonterm-pred-defn ...)
                          (map (lambda (ntspec)
-                                (make-meta-pred-defn lang-name
+                                (make-meta-pred-defn
                                   (ntspec-meta-pred ntspec)
                                   (ntspec-meta-vars ntspec)))
                            ntspec*)]
@@ -48,12 +48,12 @@
                 (define parse-name parse-proc) ...
                 (case ntspec-name
                   [(ntspec-id) (parse-name stx #t (not input?) #f)] ...
-                  [else (error 'lang-name
+                  [else (error '#,lang-name
                           "unrecognized nonterminal passed to meta parser"
                           ntspec-name)]))))))))
 
   (define make-meta-pred-defn
-    (lambda (lang-name pred? meta*)
+    (lambda (pred? meta*)
       #`(define (#,pred? id)
           (memq (meta-var->raw-meta-var (syntax->datum id))
             (quote #,meta*)))))
@@ -427,7 +427,7 @@
                             (map (lambda (x) (find-spec x omrec)) (pair-alt-field-names prec-alt))
                             binding*)])
               (values
-                #`(#,(pair-alt-checking-maker prec-alt) '#,pass-name #,@field* #,@(map id->msg id*))
+                #`(#,(pair-alt-maker prec-alt) '#,pass-name #,@field* #,@(map id->msg id*))
                 #f var* binding*)))))
       (define process-nano-elt
         (lambda (elt spec binding*)

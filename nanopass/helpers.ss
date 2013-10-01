@@ -3,7 +3,7 @@
 
 #!chezscheme
 (library (nanopass helpers)
-  (export combine ellipsis? unquote? unique-id
+  (export combine ellipsis? unquote? unique-symbol
           construct-id ensure-no-suffix
           generate-acc partition-syn gentemp 
           bound-id-member? bound-id-union my-enumerate 
@@ -22,7 +22,7 @@
           list-head module
           indirect-export syntax->annotation
           annotation-source source-object-bfp source-object-sfd source-file-descriptor-path
-          all-unique-identifiers? regensym)
+          all-unique-identifiers? regensym make-list iota)
   (import (rnrs) (nanopass implementation-helpers))
 
   ;; the following should get moved into Chez Scheme proper (and generally
@@ -177,28 +177,26 @@
            (or (free-identifier=? x #'list-of)
                (eq? (syntax->datum x) 'list-of)))))
 
-  ;;; unique-id produces a unique name derived the input name by
+  ;;; unique-symbol produces a unique name derived the input name by
   ;;; adding a unique suffix of the form .<digit>+.  creating a unique
   ;;; name from a unique name has the effect of replacing the old
   ;;; unique suffix with a new one.
   
-  (define count 0)
-
   (define unique-suffix
-    (lambda ()
-      (set! count (+ count 1))
-      (number->string count))) 
+    (let ((count 0))
+      (lambda ()
+        (set! count (+ count 1))
+        (number->string count))))
   
-  (define unique-id
-    (lambda (tid id . id*)
-      (datum->syntax tid
-        (string->symbol
-          (string-append
-            (fold-right
-              (lambda (id str) (string-append str ":" (symbol->string (syntax->datum id))))
-              (symbol->string (syntax->datum id)) id*)
-            "."
-            (unique-suffix))))))
+  (define unique-symbol
+    (lambda (id . id*)
+      (string->symbol
+        (string-append
+          (fold-right
+            (lambda (id str) (string-append str ":" (symbol->string (syntax->datum id))))
+            (symbol->string (syntax->datum id)) id*)
+          "."
+          (unique-suffix)))))
 
   ;; This is a macro that shows what the language name identifier is
   ;; bound to in the expansion time environment 

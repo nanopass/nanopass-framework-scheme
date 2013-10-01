@@ -515,3 +515,31 @@ LATEST
     dead nonterminals or terminals in the language, prunes them, and returns an
     S-expression representing only the reachable parts of the language.
       nanopass/language.ss, nanopass.ss
+2013-10-01
+  * changed unique-id to unique-symbol, since we are now building the
+    unique-symbol and using it directly instead of generating the id to use in
+    output syntax.  also exporting make-list to make generating accessors
+    easier.
+      nanopass/helpers.ss, nanopass/implementation-helpers.chezscheme.ss,
+      nanopass/implementation-helpers.ss
+  * fixed language->s-expression to no longer output the nongenerative id of
+    an ntspec, since it is no longer necessary to specify for each ntspec
+      nanopass/language.ss
+  * small cleanup of the meta-parser.  removed extra (unused) argument to a
+    couple of procedures.
+      nanopass/meta-parsers.ss, nanopass/parser.ss, nanopass/unparser.ss
+  * removed differentiation between checking and non-checking maker, since we
+    are no longer using the non-checking maker.
+      nanopass/meta-parsers.ss, nanopass/records.ss, nanopass/parser.ss,
+      nanopass/pass.ss
+  * improved checking of meta-variables so that if the wrong meta-variable is
+    used, it will report it to the user, rather than doing a check that will
+    always fail we now report that an invalid meta-variable was used at expand
+    time.  also did some general cleanup and improved error messages around
+    using quoted items in a pattern match.
+      nanopass/pass.ss, nanopass/records.ss
+  * changed record creation code to skip the define-record-type macro and
+    instead we are creating the records directly using the procedural
+    interface.  this (hopefully) helps the memory usage and speed of expanding
+    language definitions.
+      nanopass/records.ss

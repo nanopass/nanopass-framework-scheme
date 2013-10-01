@@ -57,7 +57,7 @@
           (define make-pair-clause
             (lambda (alt)
               (let ([field-pats (pair-alt-pattern alt)])
-                (with-syntax ([maker (pair-alt-checking-maker alt)]
+                (with-syntax ([maker (pair-alt-maker alt)]
                                [(field-var ...) (pair-alt-field-names alt)])
                   (with-syntax ([(parsed-field ...)
                                   (map parse-field #'(field-var ...)
@@ -108,7 +108,7 @@
                 (error (if trace? 'trace-define-syntax 'define-syntax)
                   "invalid language identifier" lang))
               (let* ([ntname (language-entry-ntspec desc)]
-                     [lang-name (language-record desc)]
+                     [lang-name (language-name desc)]
                      [ntspecs (language-ntspecs desc)]
                      [tspecs (language-tspecs desc)])
                 (with-syntax ([(entry-name parse-name ...)

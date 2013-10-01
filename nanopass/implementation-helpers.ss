@@ -12,7 +12,7 @@
           annotation-source source-object-bfp source-object-sfd source-file-descriptor-path
           scheme-version= scheme-version< scheme-version> scheme-version>= scheme-version<=
           with-scheme-version gensym? errorf with-output-to-string with-input-from-string $primitive
-          list-head)
+          list-head make-list iota)
   (import (chezscheme))
 
   (define-syntax define-scheme-version-relop
