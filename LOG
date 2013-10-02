@@ -553,4 +553,9 @@ LATEST
     OS X and Linux.  these scripts require a setup with multiple versions of
     the Chez Scheme compiler installed.
       bin/build-shared-objects, bin/compile-file-to-lib-dir
-
+2013-10-02
+  * added a define-pruned-language form that prunes a language and then defines
+    it with a new name.  also changed diff-languages to output code that is
+    appropriate for the current implemntation of language extensions in the
+    nanopass framework.
+      nanopass.ss, nanopass/languages.ss

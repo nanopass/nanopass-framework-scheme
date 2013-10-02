@@ -523,9 +523,9 @@
                             (cond
                               [(pair-alt? a)
                                (let* ([syn (alt-syn a)]
-                                       [name (car syn)]
-                                       [rec-sym (unique-symbol lang-name ntname name)]
-                                       [m? (meta? name)])
+                                      [name (car syn)]
+                                      [rec-sym (unique-symbol lang-name ntname name)]
+                                      [m? (meta? name)])
                                  (let-values ([(p fields levels maybes) (convert-pattern (if m? syn (cdr syn)))])
                                    (unless (all-unique-identifiers? fields)
                                      (syntax-violation 'define-language "found one or more duplicate fields in production" syn))
