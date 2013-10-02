@@ -17,6 +17,10 @@ Files
                      performing a testing run of all of the tests.
     tests/        -- contains a testing compiler along with tests for that
                      compiler and a driver for running the tests
+    lib/          -- pre-compiled binaries for use with petite
+
+For more information on using the pre-compile binaries, see the README.md file
+in the `lib` directory.
 
 References
 ===========

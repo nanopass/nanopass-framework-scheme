@@ -1,0 +1,26 @@
+(import (chezscheme))
+
+(define cannonical-version-string
+  (lambda ()
+    (call-with-values scheme-version-number
+      (rec format-version
+        (case-lambda
+          [(major minor) (format-version major minor 0)]
+          [(major minor mini)
+           (if (fxzero? mini)
+               (format "csv~d.~d" major minor)
+               (format "csv~d.~d.~d" major minor mini))])))))
+
+(define compile-file-to-library-dir
+  (lambda (fn)
+    (compile-file fn
+      (format "lib/~a/~s/~a.so"
+        (cannonical-version-string)
+        (machine-type)
+        (path-root (path-last fn))))))
+
+(apply
+  (case-lambda
+    [(fn) (compile-file-to-library-dir fn)]
+    [rest (printf "please supply a file to be compiled~%")])
+  (command-line-arguments))

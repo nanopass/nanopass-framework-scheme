@@ -515,6 +515,11 @@ LATEST
     dead nonterminals or terminals in the language, prunes them, and returns an
     S-expression representing only the reachable parts of the language.
       nanopass/language.ss, nanopass.ss
+2013-09-16
+  * Fixed a bug with the parser that caused bare boolean terminals to fail to
+    parse.  Specifically, since #f was used to indicate a failed parse,
+    parsing the bare boolean #f was raising an error.
+      nanopass/parse.ss, tests/unit-tests.ss
 2013-10-01
   * changed unique-id to unique-symbol, since we are now building the
     unique-symbol and using it directly instead of generating the id to use in
@@ -543,3 +548,9 @@ LATEST
     interface.  this (hopefully) helps the memory usage and speed of expanding
     language definitions.
       nanopass/records.ss
+2013-10-02
+  * added bin directory to automate the process of building binaries across Mac
+    OS X and Linux.  these scripts require a setup with multiple versions of
+    the Chez Scheme compiler installed.
+      bin/build-shared-objects, bin/compile-file-to-lib-dir
+

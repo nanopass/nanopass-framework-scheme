@@ -1,0 +1,99 @@
+#!/usr/bin/scheme --program
+(import (chezscheme))
+
+;(define system (lambda (str) (display str) (newline)))
+
+(define build-build-script
+  (lambda (version mt threaded?)
+    (format
+      "~~/bin/vscheme ~s -m ~s ~:[-t~;~] --program bin/compile-file-to-lib-dir nanopass.ss"
+      version mt threaded?)))
+
+(define build-target-file
+  (lambda (version mt threaded?)
+    (format "lib/~s/~:[t~;~]~s/nanopass.so" version threaded? mt)))
+
+(define-record-type target
+  (nongenerative)
+  (sealed #t)
+  (fields version machine-type host threaded?))
+
+(define-syntax make-targets
+  (lambda (x)
+    (syntax-case x ()
+      [(_ [version* [host** mt*** ...] ...] ...)
+       (with-syntax ([(((version*** ...) ...) ...)
+                      (map (lambda (version mt**)
+                             (map (lambda (mt*)
+                                    (make-list (length mt*) version))
+                               mt**))
+                        #'(version* ...) #'(((mt*** ...) ...) ...))]
+                     [(((host*** ...) ...) ...)
+                      (map (lambda (host* mt**)
+                             (map (lambda (host mt*)
+                                    (make-list (length mt*) host))
+                               host* mt**))
+                        #'((host** ...) ...) #'(((mt*** ...) ...) ...))])
+         #'(list
+             (make-target 'version*** 'mt*** 'host*** #f) ... ... ...
+             (make-target 'version*** 'mt*** 'host*** #t) ... ... ...))])))
+
+(define targets
+  (make-targets
+    [csv8.4
+      [plasticman a6osx i3osx]
+      [firehawk   a6le i3le]]))
+
+(define setup-host
+  (let ()
+    (define hosts (make-eq-hashtable))
+    (lambda (host)
+      (unless (eq-hashtable-ref hosts host #f)
+        (let ([host-ok? (call-with-values
+                          (lambda ()
+                            (open-process-ports
+                              (format
+                                "ssh ~s \"sh -c 'if [ -e ~~/bin/vscheme ] ; then echo \\#t ; else echo \\#f ; fi'\""
+                                host)))
+                          (lambda (stdin stdout stderr pid)
+                            (close-port stdin)
+                            (close-port stderr)
+                            (let ([result (read (transcoded-port
+                                                  stdout (native-transcoder)))])
+                              (close-port stdout)
+                              result)))])
+          (unless host-ok? (error #f "unable to run vscheme on ~s" host))
+          (system (format "rsync -aqz --exclude .git --exclude lib . ~s:/tmp/nanopass-framework" host))
+          (eq-hashtable-set! hosts host #t))))))
+
+(define machines*
+  '((a6osx i3osx ta6osx ti3osx) ; Intel Mac
+    (a6le i3le ta6le ti3le)))   ; Intel Linux
+    
+
+(define same-machine?
+  (let ([machines (find (lambda (machines) (memq (machine-type) machines)) machines*)])
+    (lambda (mt)
+      (and (memq mt machines) #t))))
+
+(define remote-system
+  (lambda (host s target)
+    (setup-host host)
+    (system (format "ssh ~s 'cd /tmp/nanopass-framework && ~a'" host s))
+    (system (format "scp ~s:/tmp/nanopass-framework/~a ~a" host target target))))
+
+(define build-target
+  (lambda (t)
+    (let ([mt (target-machine-type t)])
+      (let ([s (build-build-script (target-version t) mt (target-threaded? t))])
+        (if (same-machine? mt)
+            (system s)
+            (remote-system (target-host t) s
+              (build-target-file (target-version t) mt
+                (target-threaded? t))))))))
+
+(unless (file-exists? "~/bin/vscheme")
+  (error #f "building shared objects requires vscheme script"))
+
+(for-each build-target targets)
+
