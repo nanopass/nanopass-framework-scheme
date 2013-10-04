@@ -602,39 +602,42 @@
           (define-who annotate-all-pred!
             (lambda (ntspec)
               (let ([all-pred (ntspec-all-pred ntspec)])
-                (if all-pred
-                    (values all-pred (ntspec-all-term-pred ntspec) (ntspec-all-tag ntspec))
-                    (let f ([alt* (ntspec-alts ntspec)] [pred* '()] [term-pred* '()] [tag '()])
-                      (if (null? alt*)
-                          (let ([all-pred (if (null? pred*)
-                                              (ntspec-pred ntspec)
-                                              #`(lambda (x)
-                                                  (or (#,(ntspec-pred ntspec) x)
-                                                      #,@(map (lambda (pred) #`(#,pred x)) pred*))))]
-                                [all-term-pred (cond
-                                                 [(null? term-pred*) #f]
-                                                 [(null? (cdr term-pred*)) (car term-pred*)]
-                                                 [else #`(lambda (x) (or #,@(map (lambda (pred) #`(#,pred x)) term-pred*)))])]
-                                [tag (cons (ntspec-tag ntspec) tag)])
-                            (ntspec-all-pred-set! ntspec all-pred)
-                            (ntspec-all-term-pred-set! ntspec all-term-pred)
-                            (ntspec-all-tag-set! ntspec tag)
-                            (values all-pred all-term-pred tag))
-                          (let ([alt (car alt*)])
-                            (cond
-                              [(pair-alt? alt) (f (cdr alt*) pred* term-pred* tag)]
-                              [(terminal-alt? alt)
-                               (let* ([tspec (terminal-alt-tspec alt)]
-                                      [new-tag (tspec-tag tspec)]
-                                      [pred (tspec-pred tspec)])
-                                 (f (cdr alt*) (cons pred pred*)
-                                   (if #f #;new-tag term-pred* (cons pred term-pred*))
-                                   (if #f #;new-tag (fxior new-tag tag) tag)))]
-                              [(nonterminal-alt? alt)
-                               (let-values ([(pred term-pred new-tag) (annotate-all-pred! (nonterminal-alt-ntspec alt))])
-                                 (f (cdr alt*) (cons pred pred*)
+                (cond
+                  [(eq? all-pred 'processing) (syntax-violation 'define-language "found mutually recursive nonterminals" (ntspec-name ntspec))]
+                  [all-pred (values all-pred (ntspec-all-term-pred ntspec) (ntspec-all-tag ntspec))]
+                  [else
+                   (ntspec-all-pred-set! ntspec 'processing)
+                   (let f ([alt* (ntspec-alts ntspec)] [pred* '()] [term-pred* '()] [tag '()])
+                     (if (null? alt*)
+                         (let ([all-pred (if (null? pred*)
+                                             (ntspec-pred ntspec)
+                                             #`(lambda (x)
+                                                 (or (#,(ntspec-pred ntspec) x)
+                                                     #,@(map (lambda (pred) #`(#,pred x)) pred*))))]
+                               [all-term-pred (cond
+                                                [(null? term-pred*) #f]
+                                                [(null? (cdr term-pred*)) (car term-pred*)]
+                                                [else #`(lambda (x) (or #,@(map (lambda (pred) #`(#,pred x)) term-pred*)))])]
+                               [tag (cons (ntspec-tag ntspec) tag)])
+                           (ntspec-all-pred-set! ntspec all-pred)
+                           (ntspec-all-term-pred-set! ntspec all-term-pred)
+                           (ntspec-all-tag-set! ntspec tag)
+                           (values all-pred all-term-pred tag))
+                         (let ([alt (car alt*)])
+                           (cond
+                             [(pair-alt? alt) (f (cdr alt*) pred* term-pred* tag)]
+                             [(terminal-alt? alt)
+                              (let* ([tspec (terminal-alt-tspec alt)]
+                                     [new-tag (tspec-tag tspec)]
+                                     [pred (tspec-pred tspec)])
+                                (f (cdr alt*) (cons pred pred*)
+                                  (if #f #;new-tag term-pred* (cons pred term-pred*))
+                                  (if #f #;new-tag (fxior new-tag tag) tag)))]
+                             [(nonterminal-alt? alt)
+                              (let-values ([(pred term-pred new-tag) (annotate-all-pred! (nonterminal-alt-ntspec alt))])
+                                (f (cdr alt*) (cons pred pred*)
                                    (if term-pred (cons term-pred term-pred*) term-pred*)
-                                   (append new-tag tag)))]))))))))
+                                   (append new-tag tag)))]))))]))))
           (let ([lang-rtd (make-record-type-descriptor (syntax->datum lang-name)
                             (record-type-descriptor nanopass-record)
                             (let ([nongen-id (language-nongenerative-id lang)])
