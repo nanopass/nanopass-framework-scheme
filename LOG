@@ -565,3 +565,7 @@ LATEST
     this in the future, there is probably a way to do so, we just need to be
     careful about pass generation.
       nanopass/records.ss
+2013-10-04
+  * fixed a small bug in the error reporting code for the stricter checking of
+    nanopass meta-variables.
+      nanopass/pass.ss

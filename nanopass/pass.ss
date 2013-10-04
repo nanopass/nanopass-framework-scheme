@@ -679,7 +679,7 @@
                                  "expected meta-variable for nonterminal ~s, but got"
                                  (syntax->datum itype))
                                id)))]
-                      [(term-id->tspec? itype (language-ntspecs ilang)) =>
+                      [(term-id->tspec? itype (language-tspecs ilang)) =>
                        (lambda (tspec)
                          (syntax-violation
                            (syntax->datum (pass-desc-name pass-desc))
