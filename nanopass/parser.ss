@@ -7,8 +7,7 @@
           (nanopass helpers)
           (nanopass records)
           (nanopass syntaxconvert)
-          (nanopass nano-syntax-dispatch)
-          (only (chezscheme) trace-define trace-lambda))
+          (nanopass nano-syntax-dispatch))
 
   (define np-parse-fail-token '#{np-parse-fail-token dlkcd4b37swscag1dvmuiz-13})
 
@@ -116,11 +115,12 @@
       (define make-parser
         (lambda (parser-name lang trace?)
           (lambda (r)
-            (let ([desc (guard (c [else #f]) (r lang))])
-              (unless desc
+            (let ([desc-pair (guard (c [else #f]) (r lang))])
+              (unless desc-pair
                 (error (if trace? 'trace-define-syntax 'define-syntax)
                   "invalid language identifier" lang))
-              (let* ([ntname (language-entry-ntspec desc)]
+              (let* ([desc (car desc-pair)]
+                     [ntname (language-entry-ntspec desc)]
                      [lang-name (language-name desc)]
                      [ntspecs (language-ntspecs desc)]
                      [tspecs (language-tspecs desc)])

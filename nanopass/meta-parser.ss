@@ -9,11 +9,7 @@
           (nanopass helpers)
           (nanopass records)
           (nanopass syntaxconvert)
-          (nanopass meta-syntax-dispatch)
-          (only (chezscheme) trace-define
-            ; used to lookup syntax information for generating better run-time
-            ; error messages
-            optimize-level))
+          (nanopass meta-syntax-dispatch))
 
   (define make-meta-parser
     (lambda (desc)
@@ -40,7 +36,8 @@
                          (map (lambda (ntspec)
                                 (make-meta-parse-proc desc tspec* ntspec*
                                   ntspec lang-name #'cata?))
-                           ntspec*)])
+                           ntspec*)]
+                        [name (construct-id lang-name "meta-parse-" lang-name)])
           #`(lambda (ntspec-name stx input?)
               (let ([cata? input?])
                 term-pred-defn ...
@@ -339,31 +336,11 @@
     (lambda (pass-name ntname omrec ometa-parser rhs-rec)
       (define id->msg
         (lambda (id)
-          (define build-format
-            (lambda (type)
-              (lambda (a)
-                (let ([src (annotation-source a)])
-                  (format "expression ~s position ~s of ~a" type (source-object-bfp src)
-                    (source-file-descriptor-path (source-object-sfd src)))))))
-          (define flatten
-            (lambda (x)
-              (cond
-                [(pair? x) (append (flatten (car x)) (flatten (cdr x)))]
-                [(or (not x) (null? x)) '()]
-                [else (list x)])))
-          (if (fx=? (optimize-level) 3)
-              #f
-              (cond
-                [(syntax->annotation id) => (build-format 'at)]
-                [(list? id)
-                 (let f ([ls (flatten id)])
-                   (if (null? ls)
-                       (format "~s" (syntax->datum id))
-                       (let ([x (car ls)])
-                         (cond
-                           [(syntax->annotation x) => (build-format 'near)]
-                           [else (f (cdr ls))]))))]
-                [else (format "~s" (syntax->datum id))]))))
+          (cond
+            [(fx=? (optimize-level) 3) #f]
+            [(syntax->source-info id) =>
+             (lambda (si) (format "expression ~s ~a" (syntax->datum id) si))]
+            [else (format "expression ~s" (syntax->datum id))])))
       (define process-nano-fields
         (lambda (elt* spec* binding*)
           (if (null? elt*)

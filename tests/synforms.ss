@@ -59,7 +59,7 @@
 
 (library (tests synforms)
   (export syncase)
-  (import (except (rnrs) syntax-rules) (only (chezscheme) syntax-rules))
+  (import (rnrs))
   
   (define-syntax syncase
     (syntax-rules ()
@@ -96,33 +96,34 @@
       [(pm:parse start X K) (pm:ak K (keyword X) ())]))
   
   (define-syntax pm:parseqq;; returns parsed thing + used formals
-    (syntax-rules (unquote start dothead dottail dottemps pairhead pairtail)
-      [(pm:parseqq start (unquote ()) K) (pm:error "Bad variable: ~s" ())]
-      [(pm:parseqq start (unquote (quasiquote X)) K) (pm:parseqq start X K)]
-      [(pm:parseqq start (unquote (X . Y)) K)
-       (pm:error "Bad variable: ~s" (X . Y))]
-      [(pm:parseqq start (unquote #(X ...)) K)
-       (pm:error "Bad variable: ~s" #(X ...))]
-      [(pm:parseqq start (unquote X) K) (pm:ak K (formal X) (X))]
-      [(pm:parseqq start (X dots . Y) K) 
-       (eq? (syntax->datum #'dots) '...)
-       (pm:parseqq start X (pm:parseqq dothead Y K))]
-      [(pm:parseqq dothead Y K Xpat Xformals)
-       (pm:parseqq^ start Y () ()
-       (pm:parseqq dottail Xpat Xformals K))]
-      [(pm:parseqq dottail Xpat Xformals K Yrevpat Yformals)
-       (pm:gen-temps Xformals ()
-         (pm:parseqq dottemps Xpat Yrevpat Xformals Yformals K))]
-      [(pm:parseqq dottemps Xpat Yrevpat (Xformal ...) (Yformal ...) K Xtemps)
-       (pm:ak K (dots (Xformal ...) Xtemps Xpat Yrevpat)
-         (Xformal ... Yformal ...))] 
-      [(pm:parseqq start (X . Y) K)
-       (pm:parseqq start X (pm:parseqq pairhead Y K))]
-      [(pm:parseqq pairhead Y K Xpat Xformals)
-       (pm:parseqq start Y (pm:parseqq pairtail Xpat Xformals K))]
-      [(pm:parseqq pairtail Xpat (Xformal ...) K Ypat (Yformal ...))
-       (pm:ak K (pair Xpat Ypat) (Xformal ... Yformal ...))]
-      [(pm:parseqq start X K) (pm:ak K (keyword X) ())])) 
+    (lambda (x)
+      (syntax-case x (unquote start dothead dottail dottemps pairhead pairtail)
+        [(pm:parseqq start (unquote ()) K) #'(pm:error "Bad variable: ~s" ())]
+        [(pm:parseqq start (unquote (quasiquote X)) K) #'(pm:parseqq start X K)]
+        [(pm:parseqq start (unquote (X . Y)) K)
+         #'(pm:error "Bad variable: ~s" (X . Y))]
+        [(pm:parseqq start (unquote #(X ...)) K)
+         #'(pm:error "Bad variable: ~s" #(X ...))]
+        [(pm:parseqq start (unquote X) K) #'(pm:ak K (formal X) (X))]
+        [(pm:parseqq start (X dots . Y) K) 
+         (eq? (syntax->datum #'dots) '...)
+         #'(pm:parseqq start X (pm:parseqq dothead Y K))]
+        [(pm:parseqq dothead Y K Xpat Xformals)
+         #'(pm:parseqq^ start Y () ()
+             (pm:parseqq dottail Xpat Xformals K))]
+        [(pm:parseqq dottail Xpat Xformals K Yrevpat Yformals)
+         #'(pm:gen-temps Xformals ()
+             (pm:parseqq dottemps Xpat Yrevpat Xformals Yformals K))]
+        [(pm:parseqq dottemps Xpat Yrevpat (Xformal ...) (Yformal ...) K Xtemps)
+         #'(pm:ak K (dots (Xformal ...) Xtemps Xpat Yrevpat)
+             (Xformal ... Yformal ...))] 
+        [(pm:parseqq start (X . Y) K)
+         #'(pm:parseqq start X (pm:parseqq pairhead Y K))]
+        [(pm:parseqq pairhead Y K Xpat Xformals)
+         #'(pm:parseqq start Y (pm:parseqq pairtail Xpat Xformals K))]
+        [(pm:parseqq pairtail Xpat (Xformal ...) K Ypat (Yformal ...))
+         #'(pm:ak K (pair Xpat Ypat) (Xformal ... Yformal ...))]
+        [(pm:parseqq start X K) #'(pm:ak K (keyword X) ())])))
   
   (define-syntax pm:parseqq^;; returns list-of parsed thing + used formals
     (syntax-rules (dots start pairhead)

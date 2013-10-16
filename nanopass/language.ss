@@ -18,10 +18,10 @@
   (export define-language language->s-expression diff-languages prune-language define-pruned-language)
   (import (rnrs)
           (nanopass helpers)
+          (nanopass language-helpers)
           (nanopass records)
           (nanopass unparser)
-          (nanopass meta-parser)
-          (only (chezscheme) trace-let printf))
+          (nanopass meta-parser))
  
   (define-syntax define-language
     (syntax-rules ()
@@ -289,20 +289,23 @@
             (let-values ([(base-lang entry-ntspec terms ntspecs nongen-id) (parse-clauses ldef)])
               (lambda (r)
                 (if base-lang
-                    (let ([base (r base-lang)])
-                      (unless (language? base)
+                    (let ([base-pair (r base-lang)])
+                      (unless (and (pair? base-pair)
+                                   (language? (car base-pair))
+                                   (procedure? (cdr base-pair)))
                         (syntax-violation 'define-language
                           "unrecognized base language" base-lang x))
-                      (let ([entry-ntspec (or entry-ntspec (language-entry-ntspec base))])
-                        (finish r nongen-id entry-ntspec name name
-                          (let-values ([(terms+ terms-) (partition-terms terms)])
-                            (let* ([tspecs (freshen-tspecs (language-tspecs base) terms-)]
-                                   [tspecs (add-tspecs tspecs terms+)]
-                                   [terminal-meta* (extract-terminal-metas tspecs)])
-                              (let-values ([(ntspecs+ ntspecs-) (partition-ntspecs ntspecs terminal-meta*)])
-                                (let* ([ntspecs (freshen-ntspecs (language-ntspecs base) ntspecs-)]
-                                       [ntspecs (add-ntspecs ntspecs ntspecs+)])
-                                  (make-language name entry-ntspec tspecs ntspecs nongen-id))))))))
+                      (let ([base (car base-pair)])
+                        (let ([entry-ntspec (or entry-ntspec (language-entry-ntspec base))])
+                          (finish r nongen-id entry-ntspec name name
+                            (let-values ([(terms+ terms-) (partition-terms terms)])
+                              (let* ([tspecs (freshen-tspecs (language-tspecs base) terms-)]
+                                     [tspecs (add-tspecs tspecs terms+)]
+                                     [terminal-meta* (extract-terminal-metas tspecs)])
+                                (let-values ([(ntspecs+ ntspecs-) (partition-ntspecs ntspecs terminal-meta*)])
+                                  (let* ([ntspecs (freshen-ntspecs (language-ntspecs base) ntspecs-)]
+                                         [ntspecs (add-ntspecs ntspecs ntspecs+)])
+                                    (make-language name entry-ntspec tspecs ntspecs nongen-id)))))))))
                     (let* ([tspecs (parse-terms terms)]
                            [terminal-meta* (extract-terminal-metas tspecs)])
                       (finish r nongen-id entry-ntspec name name
@@ -336,8 +339,8 @@
                 predicates ...
                 (define-syntax #,lang 
                   (make-compile-time-value
-                    '#,desc))
-                (define-property #,lang meta-parser-property meta-parser)
+                    (cons '#,desc meta-parser)))
+                #;(define-property #,lang meta-parser-property meta-parser)
                 (define-who unparser-name unparser)))))
 
       (syntax-case x ()
@@ -350,6 +353,7 @@
 
   (define-syntax language->s-expression
     (lambda (x)
+      (define who 'language->s-expression)
       (define doit
         (lambda (lang handler?)
           (define tspec->s-expression
@@ -368,16 +372,18 @@
               #`(#,(ntspec-name p) #,(ntspec-meta-vars p)
                  #,@(map alt->s-expression (ntspec-alts p)))))
           (lambda (env)
-            (let ([lang (env lang)])
-              (with-syntax ([(ng ...) (let ([nongen-id (language-nongenerative-id lang)])
-                                        (if nongen-id
-                                            #`((nongenerative-id #,nongen-id))
-                                            #'()))])
-                #`'(define-language #,(language-name lang)
-                     ng ...
-                     (entry #,(language-entry-ntspec lang))
-                     (terminals #,@(map tspec->s-expression (language-tspecs lang)))
-                     #,@(map ntspec->s-expression (language-ntspecs lang))))))))
+            (let ([lang-pair (env lang)])
+              (unless lang-pair (syntax-violation who "language not found" lang))
+              (let ([lang (car lang-pair)])
+                (with-syntax ([(ng ...) (let ([nongen-id (language-nongenerative-id lang)])
+                                          (if nongen-id
+                                              #`((nongenerative-id #,nongen-id))
+                                              #'()))])
+                  #`'(define-language #,(language-name lang)
+                       ng ...
+                       (entry #,(language-entry-ntspec lang))
+                       (terminals #,@(map tspec->s-expression (language-tspecs lang)))
+                       #,@(map ntspec->s-expression (language-ntspecs lang)))))))))
       (syntax-case x ()
         [(_ lang) (identifier? #'lang) (doit #'lang #f)]
         [(_ lang handler?) (identifier? #'lang) (doit #'lang (syntax->datum #'handler?))])))
@@ -465,161 +471,60 @@
       (syntax-case x ()
         [(_ lang0 lang1)
          (lambda (r)
-           (let ([l0 (r #'lang0)] [l1 (r #'lang1)])
-             (unless l0 (syntax-violation who "language not found" #'lang0))
-             (unless l1 (syntax-violation who "language not found" #'lang1))
-             (with-syntax ([l1-entry (language-entry-ntspec l1)]
-                           [(term ...) (diff-terminals (language-tspecs l0) (language-tspecs l1))]
-                           [(nonterm ...) (diff-nonterminals (language-ntspecs l0) (language-ntspecs l1))]
-                           [(ng ...) (let ([nongen-id (language-nongenerative-id l1)])
-                                       (if nongen-id
-                                           #`((nongenerative-id #,nongen-id))
-                                           #'()))])
-               (syntax-case #'(term ...) ()
-                 [() #''(define-language lang1 (extends lang0)
-                          ng ...
-                          (entry l1-entry)
-                          nonterm ...)]
-                 [(term ...) #''(define-language lang1 (extends lang0)
-                                  ng ...
-                                  (entry l1-entry)
-                                  (terminals term ...)
-                                  nonterm ...)]))))])))
+           (let ([l0-pair (r #'lang0)] [l1-pair (r #'lang1)])
+             (unless l0-pair (syntax-violation who "language not found" #'lang0))
+             (unless l1-pair (syntax-violation who "language not found" #'lang1))
+             (let ([l0 (car l0-pair)] [l1 (car l1-pair)])
+               (with-syntax ([l1-entry (language-entry-ntspec l1)]
+                             [(term ...) (diff-terminals (language-tspecs l0) (language-tspecs l1))]
+                             [(nonterm ...) (diff-nonterminals (language-ntspecs l0) (language-ntspecs l1))]
+                             [(ng ...) (let ([nongen-id (language-nongenerative-id l1)])
+                                         (if nongen-id
+                                             #`((nongenerative-id #,nongen-id))
+                                             #'()))])
+                 (syntax-case #'(term ...) ()
+                   [() #''(define-language lang1 (extends lang0)
+                            ng ...
+                            (entry l1-entry)
+                            nonterm ...)]
+                   [(term ...) #''(define-language lang1 (extends lang0)
+                                    ng ...
+                                    (entry l1-entry)
+                                    (terminals term ...)
+                                    nonterm ...)])))))])))
   (define-syntax prune-language
     (lambda (x)
       (define who 'prune-language)
-      (define tspec->ts-syntax
-        (lambda (tspec)
-          (with-syntax ([(meta-vars ...) (tspec-meta-vars tspec)]
-                        [type (tspec-type tspec)])
-            #'(type (meta-vars ...)))))
-      (define ntspec->nts-syntax
-        (lambda (ntspec)
-          (with-syntax ([(meta-vars ...) (ntspec-meta-vars ntspec)]
-                        [name (ntspec-name ntspec)]
-                        [(prods ...) (map alt-syn (ntspec-alts ntspec))])
-             #'(name (meta-vars ...) prods ...))))
-      (define prune-language
-        (lambda (l)
-          (let ([entry (language-entry-ntspec l)])
-            (let ([nt* (list (nonterm-id->ntspec 'prune-language entry (language-ntspecs l)))])
-              (let loop ([nt* nt*] [ts '()] [nts '()])
-                (if (null? nt*)
-                    (with-syntax ([(ts ...) (map tspec->ts-syntax ts)]
-                                  [(nts ...) (map ntspec->nts-syntax nts)])
-                      #'((ts ...) (nts ...)))
-                    (let ([nt (car nt*)] [nt* (cdr nt*)])
-                      (let ([nts (cons nt nts)])
-                        (let inner-loop ([prod* (ntspec-alts nt)] [nt* nt*] [ts ts])
-                          (if (null? prod*)
-                              (loop nt* ts nts)
-                              (let ([prod (car prod*)])
-                                (cond
-                                  [(terminal-alt? prod)
-                                   (inner-loop (cdr prod*) nt*
-                                     (let ([tspec (terminal-alt-tspec prod)])
-                                       (if (memq tspec ts) ts (cons tspec ts))))]
-                                  [(nonterminal-alt? prod)
-                                   (inner-loop (cdr prod*) 
-                                     (let ([ntspec (nonterminal-alt-ntspec prod)])
-                                       (if (or (memq ntspec nt*) (memq ntspec nts)) nt* (cons ntspec nt*)))
-                                     ts)]
-                                  [(pair-alt? prod)
-                                   (let inner-inner-loop ([flds (pair-alt-field-names prod)] [nt* nt*] [ts ts])
-                                     (if (null? flds)
-                                         (inner-loop (cdr prod*) nt* ts)
-                                         (let ([fld (car flds)])
-                                           (cond
-                                             [(meta-name->tspec fld (language-tspecs l)) =>
-                                               (lambda (tspec)
-                                                 (inner-inner-loop (cdr flds) nt*
-                                                   (if (memq tspec ts) ts (cons tspec ts))))]
-                                             [(meta-name->ntspec fld (language-ntspecs l)) =>
-                                               (lambda (ntspec)
-                                                 (inner-inner-loop (cdr flds)
-                                                   (if (or (memq ntspec nt*) (memq ntspec nts)) nt* (cons ntspec nt*))
-                                                   ts))]))))]))))))))))))
       (syntax-case x ()
         [(_ L)
          (lambda (r)
-           (let ([l (r #'L)])
-             (unless l (syntax-violation who "language not found" #'L))
-             (with-syntax ([((ts ...) (nts ...)) (prune-language l)]
-                           [entry-nt (language-entry-ntspec l)])
-               (syntax-case #'(ts ...) ()
-                 [() #''(define-language L
-                          (entry entry-nt)
-                          nts ...)]
-                 [(ts ...) #''(define-language L
-                                (entry entry-nt)
-                                (terminals ts ...)
-                                nts ...)]))))])))
+           (let ([l-pair (r #'L)])
+             (unless l-pair (syntax-violation who "language not found" #'L))
+             (let ([l (car l-pair)])
+               (with-syntax ([((ts ...) (nts ...)) (prune-language-helper l)]
+                             [entry-nt (language-entry-ntspec l)])
+                 (syntax-case #'(ts ...) ()
+                   [() #''(define-language L
+                            (entry entry-nt)
+                            nts ...)]
+                   [(ts ...) #''(define-language L
+                                  (entry entry-nt)
+                                  (terminals ts ...)
+                                  nts ...)])))))])))
   
   (define-syntax define-pruned-language
     (lambda (x)
-      (define who 'prune-language)
-      (define tspec->ts-syntax
-        (lambda (tspec)
-          (with-syntax ([(meta-vars ...) (tspec-meta-vars tspec)]
-                        [type (tspec-type tspec)])
-            #'(type (meta-vars ...)))))
-      (define ntspec->nts-syntax
-        (lambda (ntspec)
-          (with-syntax ([(meta-vars ...) (ntspec-meta-vars ntspec)]
-                        [name (ntspec-name ntspec)]
-                        [(prods ...) (map alt-syn (ntspec-alts ntspec))])
-             #'(name (meta-vars ...) prods ...))))
-      (define prune-language
-        (lambda (l)
-          (let ([entry (language-entry-ntspec l)])
-            (let ([nt* (list (nonterm-id->ntspec 'prune-language entry (language-ntspecs l)))])
-              (let loop ([nt* nt*] [ts '()] [nts '()])
-                (if (null? nt*)
-                    (with-syntax ([(ts ...) (map tspec->ts-syntax ts)]
-                                  [(nts ...) (map ntspec->nts-syntax nts)])
-                      #'((ts ...) (nts ...)))
-                    (let ([nt (car nt*)] [nt* (cdr nt*)])
-                      (let ([nts (cons nt nts)])
-                        (let inner-loop ([prod* (ntspec-alts nt)] [nt* nt*] [ts ts])
-                          (if (null? prod*)
-                              (loop nt* ts nts)
-                              (let ([prod (car prod*)])
-                                (cond
-                                  [(terminal-alt? prod)
-                                   (inner-loop (cdr prod*) nt*
-                                     (let ([tspec (terminal-alt-tspec prod)])
-                                       (if (memq tspec ts) ts (cons tspec ts))))]
-                                  [(nonterminal-alt? prod)
-                                   (inner-loop (cdr prod*) 
-                                     (let ([ntspec (nonterminal-alt-ntspec prod)])
-                                       (if (or (memq ntspec nt*) (memq ntspec nts)) nt* (cons ntspec nt*)))
-                                     ts)]
-                                  [(pair-alt? prod)
-                                   (let inner-inner-loop ([flds (pair-alt-field-names prod)] [nt* nt*] [ts ts])
-                                     (if (null? flds)
-                                         (inner-loop (cdr prod*) nt* ts)
-                                         (let ([fld (car flds)])
-                                           (cond
-                                             [(meta-name->tspec fld (language-tspecs l)) =>
-                                               (lambda (tspec)
-                                                 (inner-inner-loop (cdr flds) nt*
-                                                   (if (memq tspec ts) ts (cons tspec ts))))]
-                                             [(meta-name->ntspec fld (language-ntspecs l)) =>
-                                               (lambda (ntspec)
-                                                 (inner-inner-loop (cdr flds)
-                                                   (if (or (memq ntspec nt*) (memq ntspec nts)) nt* (cons ntspec nt*))
-                                                   ts))]))))]))))))))))))
+      (define who 'define-pruned-language)
       (syntax-case x ()
         [(_ L new-name)
          (lambda (r)
-           (let ([l (r #'L)])
-             (unless l (syntax-violation who "language not found" #'L))
-             (with-syntax ([((ts ...) (nts ...)) (prune-language l)]
-                           [entry-nt (language-entry-ntspec l)])
-               #'(define-language new-name
-                   (entry entry-nt)
-                   (terminals ts ...)
-                   nts ...))))]))))
+           (let ([l-pair (r #'L)])
+             (unless l-pair (syntax-violation who "language not found" #'L))
+             (let ([l (car l-pair)])
+               (with-syntax ([((ts ...) (nts ...)) (prune-language-helper l)]
+                             [entry-nt (language-entry-ntspec l)])
+                 #'(define-language new-name
+                     (entry entry-nt)
+                     (terminals ts ...)
+                     nts ...)))))]))))
 
-
-                 

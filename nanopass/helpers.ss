@@ -1,57 +1,21 @@
 ;;; Copyright (c) 2000-2013 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for detatils
 
-#!chezscheme
 (library (nanopass helpers)
-  (export combine ellipsis? unquote? unique-symbol
-          construct-id ensure-no-suffix
-          generate-acc partition-syn gentemp 
-          bound-id-member? bound-id-union my-enumerate 
-          colon?
-          arrow? warning syntax-error format 
-          make-compile-time-value pretty-print trace-define trace-let
-          trace-define-syntax trace-lambda printf time echo-syntax gensym
-          construct-id-call-count
-          construct-id-constructed-identifiers
-          extends definitions entry terminals nongenerative-id
-          construct-id-timer print-accumulating-timer
-          define-auxiliary-keyword define-auxiliary-keywords
-          plus? minus? double-arrow? double-equal? splice? list-of? rec inspect
-          with-values meta-var->raw-meta-var
-          warningf meta-parser-property define-property define-who datum
-          list-head module
-          indirect-export syntax->annotation
-          annotation-source source-object-bfp source-object-sfd source-file-descriptor-path
-          all-unique-identifiers? regensym make-list iota)
+  (export combine ellipsis? unquote? unique-symbol construct-id
+    ensure-no-suffix generate-acc partition-syn gentemp bound-id-member?
+    bound-id-union my-enumerate colon? arrow? warning syntax-error format
+    make-compile-time-value pretty-print trace-define trace-let
+    trace-define-syntax trace-lambda printf echo-syntax gensym
+    construct-id-call-count construct-id-constructed-identifiers extends
+    definitions entry terminals nongenerative-id define-auxiliary-keyword
+    define-auxiliary-keywords plus? minus? double-arrow? double-equal? splice?
+    list-of? rec with-values meta-var->raw-meta-var warningf errorf
+    meta-parser-property #;define-property define-who datum list-head module
+    indirect-export syntax->source-info optimize-level
+    all-unique-identifiers? regensym make-list iota with-implicit
+    eq-hashtable-set! eq-hashtable-ref)
   (import (rnrs) (nanopass implementation-helpers))
-
-  ;; the following should get moved into Chez Scheme proper (and generally
-  ;; cleaned up with appropriate new Chez Scheme primitives for support)
-  (define regensym
-    (let ()
-      (define offset
-        (cond
-          [(eqv? (fixnum-width) 30) 17] ; (constant symbol-name-disp)
-          [(eqv? (fixnum-width) 61) 29] ; (constant symbol-name-disp)
-          [else (errorf 'regensym "unexpected fixnum width ~s" (fixnum-width))]))
-      (define echo
-        (lambda (x)
-          (printf "~s~%" x)
-          x))
-      (case-lambda
-        [(gs extra)
-         (unless (gensym? gs) (errorf 'regensym "~s is not a gensym" gs))
-         (unless (string? extra) (errorf 'regensym "~s is not a string" extra))
-         (with-output-to-string (lambda () (format "~s" gs)))
-         (let ([name (#%$object-ref 'scheme-object gs offset)])
-           (with-input-from-string (format "#{~a ~a~a}" (cdr name) (car name) extra) read))]
-        [(gs extra0 extra1)
-         (unless (gensym? gs) (errorf 'regensym "~s is not a gensym" gs))
-         (unless (string? extra0) (errorf 'regensym "~s is not a string" extra0))
-         (unless (string? extra1) (errorf 'regensym "~s is not a string" extra1))
-         (with-output-to-string (lambda () (format "~s" gs)))
-         (let ([name (#%$object-ref 'scheme-object gs offset)])
-           (with-input-from-string (format "#{~a~a ~a~a}" (cdr name) extra0 (car name) extra1) read))])))
 
   (define all-unique-identifiers?
     (lambda (ls)
@@ -251,58 +215,6 @@
                  (vector->list (hashtable-keys ht)))]
         [(id) (hashtable-set! ht id (+ (hashtable-ref ht id 0) 1)) id])))
 
-  (define-record-type accumulating-timer
-    (fields name (mutable count) (mutable statistics))
-    (nongenerative)
-    (protocol
-      (lambda (new)
-        (lambda (name)
-          (new name 0 #f)))))
-
-  (define print-accumulating-timer
-    (lambda (at)
-      (let ([s (accumulating-timer-statistics at)])
-        (printf "~a called ~d times\n\t~d collection(s)\n\t~d ms elapsed, including ~d ms collecting\n\t~d ms elapsed real time, including ~s ms collecting\n\t~d bytes allocated, including ~d bytes reclaimed\n"
-                (accumulating-timer-name at) (accumulating-timer-count at)
-                (sstats-gc-count s) (sstats-cpu s) (sstats-gc-cpu s)
-                (sstats-real s) (sstats-gc-real s) (sstats-bytes s)
-                (sstats-gc-bytes s)))))
-
-  (define sstats-add
-    (lambda (s1 s2)
-      (make-sstats
-        (+ (sstats-cpu s1) (sstats-cpu s2))
-        (+ (sstats-real s1) (sstats-real s2))
-        (+ (sstats-bytes s1) (sstats-bytes s2))
-        (+ (sstats-gc-count s1) (sstats-gc-count s2))
-        (+ (sstats-gc-cpu s1) (sstats-gc-cpu s2))
-        (+ (sstats-gc-real s1) (sstats-gc-real s2))
-        (+ (sstats-gc-bytes s1) (sstats-gc-bytes s2)))))
-
-  (define-syntax define-accumulating-timer
-    (syntax-rules ()
-      [(_ name) (define name (make-accumulating-timer 'name))]))
-
-  (define-syntax accumulating-time
-    (syntax-rules ()
-      [(_ timer body body* ...)
-       (let ([s1 (statistics)])
-         (printf "running...\n")
-         (let ([v (begin body body* ...)])
-           (let ([s2 (statistics)])
-             (let ([s (accumulating-timer-statistics timer)]
-                   [sd (sstats-difference s1 s2)])
-               (sstats-print sd)
-               (sstats-print s1)
-               (sstats-print s2)
-               (display-statistics)
-               (accumulating-timer-count-set! timer (+ (accumulating-timer-count timer) 1))
-               (accumulating-timer-statistics-set! timer
-                 (if s (sstats-add s sd) sd))))
-           v))]))
-
-  (define-accumulating-timer construct-id-timer)
-
   ;; This concatenates two identifiers with a string inbetween like "-"
   (define construct-id
     (lambda (tid x . x*)
@@ -422,4 +334,28 @@
   (define echo-syntax
     (lambda (x)
       (pretty-print (syntax->datum x))
-      x)))
+      x))
+  
+  (define syntax->source-info
+    (lambda (stx)
+      (let ([si (syntax->source-information stx)])
+        (and si
+             (cond
+               [(and (source-information-position-line si)
+                     (source-information-position-column si))
+                (format "~s line ~s, char ~s of ~a"
+                  (source-information-type si)
+                  (source-information-position-line si)
+                  (source-information-position-column si)
+                  (source-information-source-file si))]
+               [(source-information-byte-offset-start si)
+                (format "~s byte position ~s of ~a"
+                  (source-information-type si)
+                  (source-information-byte-offset-start si)
+                  (source-information-source-file si))]
+               [(source-information-char-offset-start si)
+                (format "~s character position ~s of ~a"
+                  (source-information-type si)
+                  (source-information-char-offset-start si)
+                  (source-information-source-file si))]
+               [else (format "in ~a" (source-information-source-file si))]))))))

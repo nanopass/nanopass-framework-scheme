@@ -3,7 +3,7 @@
 
 (library (nanopass language-node-counter)
   (export define-language-node-counter)
-  (import (rnrs) (nanopass records) (only (chezscheme) trace-define-syntax))
+  (import (rnrs) (nanopass records))
 
   (define-syntax define-language-node-counter
     (lambda (x)
@@ -70,17 +70,18 @@
         [(_ name lang)
          (and (identifier? #'name) (identifier? #'lang))
          (lambda (r)
-           (let ([l (r #'lang)])
-             (unless l (syntax-violation 'define-language-node-counter "Unknown language" x #'lang))
-             (let ([ntspecs (language-ntspecs l)] [tspecs (language-tspecs l)])
-               (with-syntax ([(ntspec? ...) (map ntspec-pred ntspecs)]
-                             [(proc-name ...) (map ntspec-unparse-name ntspecs)] ; reuse these names internally
-                             [(tspec? ...) (map tspec-pred tspecs)]
-                             [(proc ...) (map (build-counter-proc #'name l) ntspecs)])
-                 #'(define name
-                     (lambda (x)
-                       (define proc-name proc) ...
-                       (cond
-                         [(ntspec? x) (proc-name x)] ...
-                         [(tspec? x) 1] ...
-                         [else (error 'name "unrecognized language record" x)])))))))]))))
+           (let ([l-pair (r #'lang)])
+             (unless l-pair (syntax-violation 'define-language-node-counter "Unknown language" x #'lang))
+             (let ([l (car l-pair)])
+               (let ([ntspecs (language-ntspecs l)] [tspecs (language-tspecs l)])
+                 (with-syntax ([(ntspec? ...) (map ntspec-pred ntspecs)]
+                               [(proc-name ...) (map ntspec-unparse-name ntspecs)] ; reuse these names internally
+                               [(tspec? ...) (map tspec-pred tspecs)]
+                               [(proc ...) (map (build-counter-proc #'name l) ntspecs)])
+                   #'(define name
+                       (lambda (x)
+                         (define proc-name proc) ...
+                         (cond
+                           [(ntspec? x) (proc-name x)] ...
+                           [(tspec? x) 1] ...
+                           [else (error 'name "unrecognized language record" x)]))))))))]))))

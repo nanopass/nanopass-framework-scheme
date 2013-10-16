@@ -20,8 +20,7 @@
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass meta-parser)
-          (rnrs mutable-pairs)
-          (only (scheme) parameterize print-gensym eq-hashtable-set! eq-hashtable-ref print-graph))
+          (rnrs mutable-pairs))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
@@ -47,8 +46,9 @@
       (lambda (r)
         (syntax-case x ()
           [(id (lang type) b b* ...)
-           (let ([olang (r #'lang)]
-                 [meta-parser (r #'lang #'meta-parser-property)])
+           (let* ([olang-pair (r #'lang)]
+                  [olang (and olang-pair (car olang-pair))]
+                  [meta-parser (and olang-pair (cdr olang-pair))])
              (unless (language? olang)
                (syntax-violation 'with-output-language "unrecognized language" #'lang))
              (unless (procedure? meta-parser)
@@ -63,8 +63,9 @@
                                                meta-parser)])
                    b b* ...)))]
           [(id lang b b* ...)
-           (let ([olang (r #'lang)]
-                 [meta-parser (r #'lang #'meta-parser-property)])
+           (let* ([olang-pair (r #'lang)]
+                  [olang (and olang-pair (car olang-pair))]
+                  [meta-parser (and olang-pair (cdr olang-pair))])
              (unless (language? olang)
                (syntax-violation 'with-output-language "unrecognized language" #'lang))
              (unless (procedure? meta-parser)
@@ -95,13 +96,12 @@
              [else (error 'nanopass-case
                      ; TODO: we were using $strip-wrap here, should be something like
                      ; $make-source-oops, but at least pseudo r6rs portable if possible
-                     #,(let ([a (syntax->annotation x)] [x (syntax->datum x)])
-                         (if a
-                             (let ([s (annotation-source a)])
-                               (format "empty else clause hit ~s in file ~s at character position ~s"
-                                 x (source-file-descriptor-path (source-object-sfd s))
-                                 (source-object-bfp s)))
-                             (format "empty else clause hit ~s" x))))])])))
+                     #,(let ([si (syntax->source-info x)])
+                         (if si
+                             (format "empty else clause hit ~s ~a"
+                               (syntax->datum x) si)
+                             (format "empty else clause hit ~s"
+                               (syntax->datum x)))))])])))
 
   (define-syntax trace-define-pass
     (lambda (x)
@@ -504,7 +504,7 @@
                                    '#,(pdesc-name pdesc))
                                  #,fml))))])))
 
-              (define gen-binding (lambda (t v) (if (eq? t v) '() #`((#,t #,v)))))
+              (define gen-binding (lambda (t v) (if (eq? t v) '() (list #`(#,t #,v)))))
               (define gen-t (lambda (acc) (if (identifier? acc) acc (gentemp))))
               (define gen-let1
                 (lambda (t v e)
@@ -883,7 +883,7 @@
                          ; this code will have to change to support that.
                           (assert (nano-unquote? elt))
                           (let ([id (nano-unquote-x elt)])
-                            (values #t '() #`((#,id #,acc-id)) '())))))))
+                            (values #t '() (list #`(#,id #,acc-id)) '())))))))
 
               (define find-eq-constraints
                 (lambda (ibinding*)
@@ -1290,12 +1290,6 @@
                 (pass-desc-name pass-desc) src-stx))
             (let ([pdesc (make-pdesc (datum->syntax #'* (gensym (format "~s->~s" itype maybe-otype)))
                            itype (list #'ir) '() maybe-otype '() '() #f #f)])
-              #;(parameterize ([print-gensym 'pretty/suffix])
-                  (printf "~s autogenerating: ~s : ~s -> ~s (adding to ~s)\n"
-                    (syntax->datum (pass-desc-name pass-desc))
-                    (syntax->datum (pdesc-name pdesc)) itype maybe-otype
-                    (map (lambda (x) (list (syntax->datum (pdesc-name x)) ': (pdesc-maybe-itype x) '-> (pdesc-maybe-otype x)))
-                      (pass-desc-pdesc* pass-desc))))
               (pass-desc-pdesc*-set! pass-desc
                 (cons pdesc (pass-desc-pdesc* pass-desc)))
               pdesc))
@@ -1413,7 +1407,9 @@
       (define lookup-lang
         (lambda (pass-name r maybe-name)
           (if maybe-name
-              (let ([lang (r maybe-name)] [meta-parser (r maybe-name #'meta-parser-property)])
+              (let* ([olang-pair (r maybe-name)]
+                     [lang (and olang-pair (car olang-pair))]
+                     [meta-parser (and olang-pair (cdr olang-pair))])
                 (unless (language? lang)
                   (syntax-violation (syntax->datum pass-name) "unrecognized language" maybe-name))
                 (unless (procedure? meta-parser)
