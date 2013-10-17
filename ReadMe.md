@@ -16,20 +16,16 @@ Files
     Copyright               -- copyright information
     TODO                    -- the head of the infinite todo list
     LOG                     -- change log for the nanopass framework
-    test-all.ss             -- is a simple wrapper for importing the compiler
-                               and performing a testing run of all of the tests.
-    nanopass.ss             -- the main interface to the nanopass compiler
-                               library
-    nanopass.chezscheme.sls -- the nanopass compiler library as a Chez Scheme
-                               library group
+    test-all.ss             -- is a simple wrapper for importing the compiler and 
+                               performing a testing run of all of the tests.
+    nanopass.ss             -- the main interface to the nanopass compiler library
+    nanopass.chezscheme.sls -- the nanopass compiler library as a Chez Scheme library group
     nanopass/               -- contains the parts that nanopass.ss aggregates
-    tests/                  -- contains a testing compiler along with tests for
-                               that compiler and a driver for running the tests
-    doc/                    -- contains a user guide and developer guide along
-                               with a makefile for generating their pdfs with
-                               pdflatex
-    lib/                    -- pre-compiled binaries for use with Petite Chez
-                               Scheme
+    tests/                  -- contains a testing compiler along with tests for that
+                               compiler and a driver for running the tests
+    doc/                    -- contains a user guide and developer guide along with a
+                               makefile for generating their pdfs with pdflatex
+    lib/                    -- pre-compiled binaries for use with Petite Chez Scheme
     bin/                    -- scripts for managing the pre-compiled binaries
 
 For more information on using the pre-compile binaries, see the README.md file
