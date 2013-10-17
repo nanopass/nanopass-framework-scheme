@@ -1,8 +1,11 @@
 TODO
 
-Suggetstions that I should JFD
+Support:
 
-1. add a way to have languages not autogenerate transformers.
+1. Create Racket version of the nanopass framework
+
+2. Extended to more R6RS libraries (at least if they support some form of
+   compile time environment).
 
 Nanopass Annoyances:
 
@@ -10,12 +13,7 @@ Nanopass Annoyances:
    above example)  This may not be bad, but without the error is a very rough 
    edge.
 
-2. No access to matcher/recognizer outside pass functions. This makes it
-   difficult to write recognizers like lambda?, simple?, etc.  or convenience
-   functions that generate new terms.  The seeds for this exist in the 
-   in-context and quasiquote functionality in define-pass.
-
-3. Output forms need to match original language forms very closely, e.g. if we
+2. Output forms need to match original language forms very closely, e.g. if we
    have:
    (define-language L
      over
@@ -42,32 +40,9 @@ Nanopass Annoyances:
 
 Features to add down the road:
 
-1. Better error reporting in general, currently it is pretty difficult to
-   figure out what went wrong.
-
-2. Pass fusing with deforestation of the intermediate passes.
-
-Simplifications to make down the road:
-
-1. Simplify the language definitions to not require parsing of the individual
-   pieces.  In general make better use of syntax-case's pattern matching
-   capabilities so we can write fewer syntax traversals
+1. Pass fusing with deforestation of the intermediate passes.
 
 Error Handling/Loosening restrictions:
 
 1. Fix parser to use positional information to report errors on the syntax
    error, in addition to reporting the error.
-
-General Clean-up:
-
-1. MAYBE WE DON'T WANT TO DO THIS
-   Meta-parser needs to be rewritten so that it does not create a lambda form
-   when the language is created. (i.e. we need to create a matching machine
-   that can be used with a little "byte code" to quickly perform matching
-   at compile time.)
-
-Compatibility with other systems:
-
-1. See if there is a way to implement something like define-property in other
-   scheme implementations -- we don't want to make this overly complicated
-   just an R^6RS library we can use.

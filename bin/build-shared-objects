@@ -6,7 +6,7 @@
 (define build-build-script
   (lambda (version mt threaded?)
     (format
-      "~~/bin/vscheme ~s -m ~s ~:[-t~;~] --program bin/compile-file-to-lib-dir nanopass.ss"
+      "~~/bin/vscheme ~s -m ~s ~:[-t~;~] --program bin/compile-file-to-lib-dir nanopass.chezscheme.sls nanopass.so"
       version mt threaded?)))
 
 (define build-target-file
@@ -32,7 +32,7 @@
                       (map (lambda (host* mt**)
                              (map (lambda (host mt*)
                                     (make-list (length mt*) host))
-                               host* mt**))
+                              host* mt**))
                         #'((host** ...) ...) #'(((mt*** ...) ...) ...))])
          #'(list
              (make-target 'version*** 'mt*** 'host*** #f) ... ... ...
@@ -76,11 +76,25 @@
     (lambda (mt)
       (and (memq mt machines) #t))))
 
+(define remote-build
+  (lambda (t s)
+    (let ([host (target-host t)])
+      (setup-host host)
+      (remote-system host
+        (format "mkdir -p lib/~s/~:[t~;~]~s" (target-version t)
+          (target-threaded? t) (target-machine-type t)))
+      (remote-system host s)
+      (copy-back host
+        (build-target-file (target-version t) (target-machine-type t)
+          (target-threaded? t))))))
+
 (define remote-system
-  (lambda (host s target)
-    (setup-host host)
-    (system (format "ssh ~s 'cd /tmp/nanopass-framework && ~a'" host s))
-    (system (format "scp ~s:/tmp/nanopass-framework/~a ~a" host target target))))
+  (lambda (host s)
+    (system (format "ssh ~s 'cd /tmp/nanopass-framework && ~a'" host s))))
+
+(define copy-back
+  (lambda (host fn)
+    (system (format "scp ~s:/tmp/nanopass-framework/~a ~a" host fn fn))))
 
 (define build-target
   (lambda (t)
@@ -88,9 +102,7 @@
       (let ([s (build-build-script (target-version t) mt (target-threaded? t))])
         (if (same-machine? mt)
             (system s)
-            (remote-system (target-host t) s
-              (build-target-file (target-version t) mt
-                (target-threaded? t))))))))
+            (remote-build t s))))))
 
 (unless (file-exists? "~/bin/vscheme")
   (error #f "building shared objects requires vscheme script"))
