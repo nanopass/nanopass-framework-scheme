@@ -29,7 +29,7 @@
     indirect-export
 
     ;; compile-time environment helpers
-    define-property make-compile-time-value
+    make-compile-time-value
 
     ;; code organization helpers
     module

@@ -2,19 +2,67 @@
 ;;; See the accompanying file Copyright for detatils
 
 (library (nanopass helpers)
-  (export combine ellipsis? unquote? unique-symbol construct-id
-    #;ensure-no-suffix #;generate-acc partition-syn gentemp bound-id-member?
-    bound-id-union #;my-enumerate colon? arrow? #;warning #;syntax-error format
-    make-compile-time-value pretty-print trace-define trace-let
-    trace-define-syntax trace-lambda printf echo-syntax gensym
-    construct-id-call-count construct-id-constructed-identifiers extends
-    definitions entry terminals nongenerative-id define-auxiliary-keyword
-    define-auxiliary-keywords plus? minus? double-arrow? double-equal? splice?
-    list-of? rec with-values meta-var->raw-meta-var warningf errorf
-    meta-parser-property #;define-property define-who datum list-head module
-    indirect-export syntax->source-info optimize-level
-    all-unique-identifiers? regensym make-list iota with-implicit
-    eq-hashtable-set! eq-hashtable-ref define-nanopass-record np-parse-fail-token)
+  (export
+    ;; auxiliary keywords for language/pass definitions
+    extends definitions entry terminals nongenerative-id
+
+    ;; predicates for looking for identifiers independent of context
+    ellipsis? unquote? colon? arrow? plus? minus? double-arrow? 
+    
+    ;; things for dealing with syntax and idetnfieris
+    all-unique-identifiers? construct-id gentemp bound-id-member? bound-id-union
+    partition-syn datum 
+
+    ;; things for dealing with language meta-variables
+    meta-var->raw-meta-var combine unique-symbol 
+    
+    ;; convenience syntactic forms
+    rec with-values define-who 
+    
+    ;; source information funtions
+    syntax->source-info 
+
+    ;;; stuff imported from implementation-helpers
+
+    ;; formatting
+    format printf pretty-print
+
+    ;; listy stuff
+    iota make-list list-head
+
+    ;; gensym stuff (related to nongenerative languages)
+    gensym regensym
+ 
+    ;; library export stuff (needed for when used inside module to
+    ;; auto-indirect export things)
+    indirect-export
+
+    ;; compile-time environment helpers
+    make-compile-time-value
+
+    ;; code organization helpers
+    module
+
+    ;; useful for warning items
+    warningf errorf
+
+    ;; used to get the best performance from hashtables
+    eq-hashtable-set! eq-hashtable-ref
+
+    ;; debugging support
+    trace-lambda trace-define-syntax trace-let trace-define
+          
+    ;; needed to know what code to generate
+    optimize-level
+
+    ;; the base record, so that we can use gensym syntax
+    define-nanopass-record
+
+    ;; failure token so that we can know when parsing fails with a gensym
+    np-parse-fail-token
+
+    ;; handy syntactic stuff
+    with-implicit)
   (import (rnrs) (nanopass implementation-helpers))
 
   (define all-unique-identifiers?
@@ -50,14 +98,7 @@
        (begin
          (define-auxiliary-keyword name*) ...)]))
 
-  (define-auxiliary-keywords extends definitions entry terminals nongenerative-id meta-parser-property)
-  
-  #;(define-syntax syntax-error
-    (syntax-rules ()
-      [(_ obj) (syntax-violation #f "invalid syntax (syntax-error)" obj)]
-      [(_ obj str) (syntax-violation #f str obj)]
-      [(_ obj str1 o2 o3 ...)
-       (syntax-violation #f (format str1 o2 o3 ...) obj)]))
+  (define-auxiliary-keywords extends definitions entry terminals nongenerative-id)
 
   (define-syntax datum
     (syntax-rules ()
@@ -106,12 +147,6 @@
            (or (free-identifier=? x #'=>)
                (eq? (syntax->datum x) '=>)))))
 
-  (define double-equal?
-    (lambda (x)
-      (and (identifier? x)
-           (or (free-identifier=? x #'==)
-               (eq? (syntax->datum x) '==)))))
-
   (define colon?
     (lambda (x)
       (and (identifier? x)
@@ -123,18 +158,6 @@
       (and (identifier? x)
            (or (free-identifier=? x #'->)
                (eq? (syntax->datum x) '->)))))
-
-  (define splice?
-    (lambda (x)
-      (and (identifier? x)
-           (or (free-identifier=? x #'splice)
-               (eq? (syntax->datum x) 'splice)))))
-
-  (define list-of? 
-    (lambda (x)
-      (and (identifier? x)
-           (or (free-identifier=? x #'list-of)
-               (eq? (syntax->datum x) 'list-of)))))
 
   ;;; unique-symbol produces a unique name derived the input name by
   ;;; adding a unique suffix of the form .<digit>+.  creating a unique
@@ -157,16 +180,6 @@
           "."
           (unique-suffix)))))
 
-  ;; This is a macro that shows what the language name identifier is
-  ;; bound to in the expansion time environment 
-  (define-syntax show
-    (lambda (x)
-      (syntax-case x ()
-        [(k id)
-         (lambda (r)
-           (with-syntax ((x (datum->syntax #'k (r #'id))))
-             #''x))]))) 
-  
   ; TODO: at some point we may want this to be a little bit more
   ; sophisticated, or we may want to have something like a regular
   ; expression style engine where we bail as soon as we can identify
@@ -188,28 +201,6 @@
                       [(char-numeric? (string-ref s i)) (f (fx- i 1))]
                       [else (string->symbol (substring s 0 (fx+ i 1)))]))])))))
 
-  (define lookup
-    (lambda (id extract ls)
-      (and (identifier? id)
-           (exists (lambda (x) 
-                     (and (free-identifier=? 
-                            (datum->syntax #'mars (syntax->datum id))
-                            (datum->syntax #'mars (syntax->datum (extract x))))
-                          x)) ls)))) 
-  
-  (define construct-id-call-count
-    (let ([count 0])
-      (case-lambda
-        [() count]
-        [(n) (set! count n)])))
-
-  (define construct-id-constructed-identifiers
-    (let ([ht (make-eq-hashtable)])
-      (case-lambda
-        [() (map (lambda (key) (cons key (hashtable-ref ht key #f)))
-                 (vector->list (hashtable-keys ht)))]
-        [(id) (hashtable-set! ht id (+ (hashtable-ref ht id 0) 1)) id])))
-
   ;; This concatenates two identifiers with a string inbetween like "-"
   (define construct-id
     (lambda (tid x . x*)
@@ -222,40 +213,10 @@
             [else (error 'construct-id "invalid input ~s" x)])))
         (unless (identifier? tid)
           (error 'construct-id "template argument ~s is not an identifier" tid))
-        #;(construct-id-call-count (+ (construct-id-call-count) 1))
         (datum->syntax 
           tid 
-          (string->symbol (apply string-append (->str x) (map ->str x*)))
-          #;(construct-id-constructed-identifiers
-            (string->symbol (apply string-append (->str x) (map ->str x*)))))))
+          (string->symbol (apply string-append (->str x) (map ->str x*))))))
 
-  #;(define ensure-no-suffix
-    (lambda (id)
-      (let ([s (symbol->string (syntax->datum id))])
-        (let ([n (string-length s)])
-          (when (and (> n 0) (char-numeric? (string-ref s (- n 1))))
-            (syntax-violation 'ensure-no-suffix 
-                              "invalid numeric suffix in metavariable" id)))))) 
-  
-  #;(define generate-acc
-    (lambda (n x)
-      (letrec ([helper
-                 (lambda (n)
-                   (if (= n 2)
-                       (list #'cdr x)
-                       (list #'cdr (helper (- n 1)))))])
-        (cond
-          [(= n 0) x]
-          [(= n 1) (list #'car x)]
-          [else (list #'car (helper n))])))) 
-  
-  (define find-decls
-    (lambda (decl decls)
-      (cond
-        [(null? decls) #f]
-        [(eq? decl (caar decls)) (car decls)]
-        [else (find-decls decl (cdr decls))]))) 
-  
   (define-syntax partition-syn
     (lambda (x)
       (syntax-case x ()
@@ -299,37 +260,6 @@
         [(null? ls1) ls2]
         [(bound-id-member? (car ls1) ls2) (bound-id-union (cdr ls1) ls2)]
         [else (cons (car ls1) (bound-id-union (cdr ls1) ls2))]))) 
-  
-  #;(define my-enumerate
-    (lambda (n ctr)
-      (if (= n ctr) '() (cons ctr (my-enumerate n (+ ctr 1)))))) 
-  
-  ;;; Higher order stuff
-  (define compose
-    (case-lambda
-      [() (lambda (x) x)]
-      [(f) f]
-      [(f . g*) (lambda (x) (f ((apply compose g*) x)))])) 
-  
-  (define disjoin
-    (case-lambda
-      [() (lambda (x) #f)]
-      [(p?) p?]
-      [(p? . q?*) (lambda (x) (or (p? x) ((apply disjoin q?*) x)))])) 
-  
-  #;(define-syntax warning
-    (syntax-rules ()
-      [(_ who fmt obj ...)
-       (raise-continuable
-         (condition
-           (make-warning)
-           (make-who-condition who)
-           (make-message-condition (format fmt obj ...))))]))
-  
-  (define echo-syntax
-    (lambda (x)
-      (pretty-print (syntax->datum x))
-      x))
   
   (define syntax->source-info
     (lambda (stx)
