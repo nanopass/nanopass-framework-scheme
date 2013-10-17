@@ -185,7 +185,7 @@
                   [atom (make-nano-quote #''atom)])
                 #,@(map (make-nonterm-clause #'stx #'maybe?) nonterm-imp-alt*)
                 (and error?
-                     (syntax-error stx "invalid pattern or template")))))))
+                     (syntax-violation #f "invalid pattern or template" stx)))))))
 
   ;; used to handle output of meta-parsers
   (define meta-parse-term

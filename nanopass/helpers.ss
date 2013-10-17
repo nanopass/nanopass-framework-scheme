@@ -3,8 +3,8 @@
 
 (library (nanopass helpers)
   (export combine ellipsis? unquote? unique-symbol construct-id
-    ensure-no-suffix generate-acc partition-syn gentemp bound-id-member?
-    bound-id-union my-enumerate colon? arrow? warning syntax-error format
+    #;ensure-no-suffix #;generate-acc partition-syn gentemp bound-id-member?
+    bound-id-union #;my-enumerate colon? arrow? #;warning #;syntax-error format
     make-compile-time-value pretty-print trace-define trace-let
     trace-define-syntax trace-lambda printf echo-syntax gensym
     construct-id-call-count construct-id-constructed-identifiers extends
@@ -14,7 +14,7 @@
     meta-parser-property #;define-property define-who datum list-head module
     indirect-export syntax->source-info optimize-level
     all-unique-identifiers? regensym make-list iota with-implicit
-    eq-hashtable-set! eq-hashtable-ref)
+    eq-hashtable-set! eq-hashtable-ref define-nanopass-record np-parse-fail-token)
   (import (rnrs) (nanopass implementation-helpers))
 
   (define all-unique-identifiers?
@@ -52,18 +52,13 @@
 
   (define-auxiliary-keywords extends definitions entry terminals nongenerative-id meta-parser-property)
   
-  (define-syntax syntax-error
+  #;(define-syntax syntax-error
     (syntax-rules ()
       [(_ obj) (syntax-violation #f "invalid syntax (syntax-error)" obj)]
       [(_ obj str) (syntax-violation #f str obj)]
       [(_ obj str1 o2 o3 ...)
        (syntax-violation #f (format str1 o2 o3 ...) obj)]))
 
-  (define-syntax with-implicit
-    (syntax-rules ()
-      [(_ (id name ...) body bodies ...)
-       (with-syntax ([name (datum->syntax #'id 'name)] ...) body bodies ...)]))
-  
   (define-syntax datum
     (syntax-rules ()
       [(_ id) (syntax->datum #'id)]))
@@ -234,7 +229,7 @@
           #;(construct-id-constructed-identifiers
             (string->symbol (apply string-append (->str x) (map ->str x*)))))))
 
-  (define ensure-no-suffix
+  #;(define ensure-no-suffix
     (lambda (id)
       (let ([s (symbol->string (syntax->datum id))])
         (let ([n (string-length s)])
@@ -242,7 +237,7 @@
             (syntax-violation 'ensure-no-suffix 
                               "invalid numeric suffix in metavariable" id)))))) 
   
-  (define generate-acc
+  #;(define generate-acc
     (lambda (n x)
       (letrec ([helper
                  (lambda (n)
@@ -305,7 +300,7 @@
         [(bound-id-member? (car ls1) ls2) (bound-id-union (cdr ls1) ls2)]
         [else (cons (car ls1) (bound-id-union (cdr ls1) ls2))]))) 
   
-  (define my-enumerate
+  #;(define my-enumerate
     (lambda (n ctr)
       (if (= n ctr) '() (cons ctr (my-enumerate n (+ ctr 1)))))) 
   
@@ -322,7 +317,7 @@
       [(p?) p?]
       [(p? . q?*) (lambda (x) (or (p? x) ((apply disjoin q?*) x)))])) 
   
-  (define-syntax warning
+  #;(define-syntax warning
     (syntax-rules ()
       [(_ who fmt obj ...)
        (raise-continuable

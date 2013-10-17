@@ -73,10 +73,11 @@
               (lambda (name)
                 (apply values
                   (or (assp (lambda (x) (bound-identifier=? x name)) meta-map)
-                      (syntax-error name
-                        "unable to find match for ~s in ~s"
-                        (syntax->datum name)
-                        (syntax->datum (pair-alt-field-names alt))))))))
+                      (syntax-violation 'define-language
+                        (format "unable to find match for ~s in ~s"
+                          (syntax->datum name)
+                          (syntax->datum (pair-alt-field-names alt)))
+                        name))))))
           (define unparse-field
             (lambda (m)
               (let-values ([(m level maybe? accr) (lookup-meta-info m)])

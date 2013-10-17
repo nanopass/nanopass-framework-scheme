@@ -43,6 +43,15 @@
     ;; needed to know what code to generate
     optimize-level
 
+    ;; the base record, so that we can use gensym syntax
+    define-nanopass-record
+
+    ;; failure token so that we can know when parsing fails with a gensym
+    np-parse-fail-token
+
+    ;; handy syntactic stuff
+    with-implicit
+
     ;; apparently not neeaded (or no longer needed)
     ; scheme-version= scheme-version< scheme-version> scheme-version>=
     ; scheme-version<= with-scheme-version gensym? errorf with-output-to-string
@@ -52,8 +61,24 @@
     (vicare)
     (rename
       (only (vicare system $compiler) $optimize-level)
-      ($optimize-level optimize-level))
-    (only (srfi :1) iota))
+      ($optimize-level optimize-level)))
+
+  (define-syntax with-implicit
+    (syntax-rules ()
+      [(_ (id name ...) body bodies ...)
+       (with-syntax ([name (datum->syntax #'id 'name)] ...) body bodies ...)]))
+
+  ; the base language
+  (define-syntax define-nanopass-record
+    (lambda (x)
+      (syntax-case x ()
+        [(k) (with-implicit (k nanopass-record nanopass-record? nanopass-record-tag)
+               #'(define-record-type (nanopass-record make-nanopass-record nanopass-record?)
+                   (nongenerative #{nanopass-record d47f8omgluol6otrw1yvu5-0})
+                   (fields (immutable tag nanopass-record-tag))))])))
+ 
+  ;; another gensym listed into this library
+  (define np-parse-fail-token '#{np-parse-fail-token dlkcd4b37swscag1dvmuiz-13})
 
   (define-syntax eq-hashtable-set! (identifier-syntax hashtable-set!))
   (define-syntax eq-hashtable-ref (identifier-syntax hashtable-ref))
@@ -65,6 +90,14 @@
           [(fxzero? n) '()]
           [(null? ls) (error 'list-head "index out of range" orig-ls orig-n)]
           [else (cons (car ls) (f (cdr ls) (fx- n 1)))]))))
+
+  (define iota
+    (lambda (n)
+      (let loop ([n n] [ls '()])
+        (if (fxzero? n)
+            ls
+            (let ([n (- n 1)])
+              (loop n (cons n ls)))))))
 
   (define regensym
     (case-lambda

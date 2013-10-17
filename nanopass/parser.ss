@@ -1,6 +1,5 @@
 ;;; Copyright (c) 2000-2013 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for detatils
-#!chezscheme
 (library (nanopass parser)
   (export define-parser trace-define-parser)
   (import (rnrs)
@@ -8,8 +7,6 @@
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass nano-syntax-dispatch))
-
-  (define np-parse-fail-token '#{np-parse-fail-token dlkcd4b37swscag1dvmuiz-13})
 
   (define-syntax parse-or
     (syntax-rules (on-error)

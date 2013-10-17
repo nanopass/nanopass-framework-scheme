@@ -3,7 +3,7 @@
 
 (library (tests unit-test-helpers-implementation)
   (export with-output-to-string display-condition)
-  (import (vicare))
+  (import (ikarus))
   
   (define display-condition
     (case-lambda
@@ -20,7 +20,4 @@
                    (format "~s in ~s" (syntax-violation-subform c) (syntax-violation-form c))
                    (format "~s" (syntax-violation-form c)))
                ""))
-         op)]))
-  
-  ;; needed to get an r6rs script to print with vicare
-  (current-output-port (current-error-port)))
+         op)])))

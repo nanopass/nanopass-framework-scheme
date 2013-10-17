@@ -1,7 +1,6 @@
 ;;; Copyright (c) 2000-2013 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for detatils
 
-#!chezscheme
 (library (nanopass records)
   (export find-spec nonterminal-meta? nano-alt->ntspec 
           nonterm-id->ntspec? nonterm-id->ntspec id->spec term-id->tspec?
@@ -57,15 +56,6 @@
 
           exists-alt?)
   (import (rnrs) (nanopass helpers) (nanopass syntaxconvert))
-
-  ; the base language
-  (define-syntax define-nanopass-record
-    (lambda (x)
-      (syntax-case x ()
-        [(k) (with-implicit (k nanopass-record nanopass-record? nanopass-record-tag)
-               #'(define-record-type (nanopass-record make-nanopass-record nanopass-record?)
-                   (nongenerative #{nanopass-record d47f8omgluol6otrw1yvu5-0})
-                   (fields (immutable tag nanopass-record-tag))))])))
 
   (define-nanopass-record)
 
@@ -646,8 +636,10 @@
                      (lambda (ntspec) (values (ntspec-all-pred ntspec) (ntspec-name ntspec)))]
                     [(terminal-meta->tspec fld tspecs) =>
                      (lambda (tspec) (values (tspec-pred tspec) (tspec-type tspec)))]
-                    [else (syntax-error fld "unrecognized meta-variable in language ~s"
-                            (syntax->datum (language-name lang)))])
+                    [else (syntax-violation 'define-language
+                            (format "unrecognized meta-variable in language ~s"
+                              (syntax->datum (language-name lang)))
+                            fld)])
                   (lambda (pred? name)
                     (with-syntax ([pred? (if maybe?
                                              #`(lambda (x) (or (eq? x #f) (#,pred? x)))

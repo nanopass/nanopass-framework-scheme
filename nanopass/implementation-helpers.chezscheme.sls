@@ -46,12 +46,33 @@
     ;; needed to know what code to generate
     optimize-level
 
+    ;; the base record, so that we can use gensym syntax
+    define-nanopass-record
+
+    ;; failure token so that we can know when parsing fails with a gensym
+    np-parse-fail-token
+
+    ;; handy syntactic stuff
+    with-implicit
+
     ;; apparently not neeaded (or no longer needed)
     ; scheme-version= scheme-version< scheme-version> scheme-version>=
     ; scheme-version<= with-scheme-version gensym? errorf with-output-to-string
     ; with-input-from-string
     )
   (import (chezscheme))
+
+  ; the base language
+  (define-syntax define-nanopass-record
+    (lambda (x)
+      (syntax-case x ()
+        [(k) (with-implicit (k nanopass-record nanopass-record? nanopass-record-tag)
+               #'(define-record-type (nanopass-record make-nanopass-record nanopass-record?)
+                   (nongenerative #{nanopass-record d47f8omgluol6otrw1yvu5-0})
+                   (fields (immutable tag nanopass-record-tag))))])))
+ 
+  ;; another gensym listed into this library
+  (define np-parse-fail-token '#{np-parse-fail-token dlkcd4b37swscag1dvmuiz-13})
 
   ;; the following should get moved into Chez Scheme proper (and generally
   ;; cleaned up with appropriate new Chez Scheme primitives for support)

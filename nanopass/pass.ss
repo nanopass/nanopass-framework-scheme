@@ -336,7 +336,7 @@
                                      fml*))]
                               [(nano-meta? nrec) (f (nano-meta-fields nrec) fml*)]
                               [(list? nrec) (f nrec fml*)]
-                              [(nano-quote? nrec) (syntax-error (nano-quote-x nrec) "quoted terminals currently unsupported in match patterns")]
+                              [(nano-quote? nrec) (syntax-violation who "quoted terminals currently unsupported in match patterns" (nano-quote-x nrec))]
                               [else (error who "unrecognized nano-rec" nrec)])))
                         fml* nrec*))))
                 (define (helper lhs guard rhs rhs*)
@@ -892,7 +892,7 @@
                         (values '() #t)
                         (let* ([ibinding (car ibinding*)] [id (car ibinding)])
                           (if (bound-id-member? id id*)
-                              (syntax-error id "eq constraints are not supported")
+                              (syntax-violation who "eq constraints are not supported" id)
                               #;(let-values ([(ibinding* ieqpred)
                                               (f (cdr ibinding*) id*)])
                                   (let ([t (gentemp)])
