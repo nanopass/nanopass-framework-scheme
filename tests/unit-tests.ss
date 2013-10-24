@@ -2,7 +2,7 @@
 ;;; See the accompanying file Copyright for detatils
 
 (library (tests unit-tests)
-  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests)
+  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support)
   (import (rnrs)
           (nanopass helpers)
           (nanopass language)
@@ -549,6 +549,231 @@
           (assert-equal?
              '(Foo 4 (Bar #f (Foo 7 #f)) (Bool #t) #f)
              (unparse-Lmaybe2 (add-one (with-output-language (Lmaybe2 Exp) `(Foo 3 (Bar #f (Foo 6 #f)) (Bool #t) #f)))))))))
+
+   ;; tests related to issue #7 on github.com
+   (define-language LPairs
+     (terminals
+       (symbol (x))
+       (null (n)))
+     (Expr (e)
+       x
+       n
+       (e0 . e1)))
+
+   (define-parser parse-LPairs LPairs)
+
+   (define-pass reverse-pairs : LPairs (p) -> LPairs ()
+     (Expr : Expr (p) -> Expr ()
+       [(,[e0] . ,[e1]) `(,e1 . ,e0)]))
+
+   (define-language LList
+     (terminals
+       (symbol (x))
+       (null (n)))
+     (Expr (e)
+       x
+       n
+       (e0 ... . e1)))
+
+   (define-parser parse-LList LList)
+
+   (define-language LList2
+     (terminals
+       (symbol (x))
+       (null (n)))
+     (Expr (e)
+       x
+       n
+       (e0 ... e1)))
+
+   (define-pass swap-parts : LList (e) -> LList ()
+     (Expr : Expr (e) -> Expr ()
+       [(,[e*] ... . ,[e])
+        `(,e ,e* ... . ())]))
+
+   ;; example provided by Simon Stapleton via bug #7
+   (define-language Lx
+     (terminals
+       (symbol (x)))
+     (Expr (e)
+       x
+       (lambda (x* ... . x) e)
+       (define (x x* ... . x1) e)
+       (define x e)))
+
+   (define-parser parse-Lx Lx)
+
+   (define-pass Px1 : Lx (ir) -> Lx ()
+     (Expr : Expr (ir) -> Expr()
+       [(define (,x ,x* ... . ,x1) ,[e])
+        `(define ,x (lambda (,x* ... . ,x1) ,e))]))
+
+   (test-suite language-dot-support
+     (test simple-dots
+       (assert-equal?
+         '()
+         (unparse-LPairs (parse-LPairs '())))
+       (assert-equal?
+         'a
+         (unparse-LPairs (parse-LPairs 'a)))
+       (assert-equal?
+         '(a)
+         (unparse-LPairs (parse-LPairs '(a))))
+       (assert-equal?
+         '(a . b)
+         (unparse-LPairs (parse-LPairs '(a . b))))
+       (assert-equal?
+         '(a b c . d)
+         (unparse-LPairs (parse-LPairs '(a b c . d))))
+       (assert-equal?
+         '(((a b . c) d e) f . g)
+         (unparse-LPairs (parse-LPairs '(((a b . c) d e) f . g))))
+       (assert-equal?
+         '()
+         (unparse-LPairs (with-output-language (LPairs Expr) `())))
+       (assert-equal?
+         'a
+         (unparse-LPairs (with-output-language (LPairs Expr) `a)))
+       (assert-equal?
+         '(a)
+         (unparse-LPairs (with-output-language (LPairs Expr) `(a))))
+       (assert-equal?
+         '(a . b)
+         (unparse-LPairs (with-output-language (LPairs Expr) `(a . b))))
+       (assert-equal?
+         '(a b c . d)
+         (unparse-LPairs (with-output-language (LPairs Expr) `(a b c . d))))
+       (assert-equal?
+         '(((a b . c) d e) f . g)
+         (unparse-LPairs (with-output-language (LPairs Expr) `(((a b . c) d e) f . g))))
+       (assert-equal?
+         '(() . a)
+         (unparse-LPairs (reverse-pairs (parse-LPairs '(a)))))
+       (assert-equal?
+         '(b . a)
+         (unparse-LPairs (reverse-pairs (parse-LPairs '(a . b)))))
+       (assert-equal?
+         '(((d . c) . b) . a)
+         (unparse-LPairs (reverse-pairs (parse-LPairs '(a b c . d)))))
+       (assert-equal?
+         '((g . f) ((() . e) . d) (c . b) . a)
+         (unparse-LPairs (reverse-pairs (parse-LPairs '(((a b . c) d e) f . g))))))
+     (test dot-after-ellipsis
+       (assert-equal?
+         '()
+         (unparse-LList (parse-LList '())))
+       (assert-equal?
+         'x
+         (unparse-LList (parse-LList 'x)))
+       (assert-equal?
+         '(a b c)
+         (unparse-LList (parse-LList '(a b c))))
+       (assert-equal?
+         '(a b c . d)
+         (unparse-LList (parse-LList '(a b c . d))))
+       (assert-equal?
+         '(((a b) (c d)) e . f)
+         (unparse-LList (parse-LList '(((a b) (c d)) e . f))))
+       (assert-equal?
+         '()
+         (unparse-LList (with-output-language (LList Expr) `())))
+       (assert-equal?
+         'x
+         (unparse-LList (with-output-language (LList Expr) `x)))
+       (assert-equal?
+         '(a b c)
+         (unparse-LList (with-output-language (LList Expr) `(a b c))))
+       (assert-equal?
+         '(a b c . d)
+         (unparse-LList (with-output-language (LList Expr) `(a b c . d))))
+       (assert-equal?
+         '(((a b) (c d)) e . f)
+         (unparse-LList (with-output-language (LList Expr) `(((a b) (c d)) e . f))))
+       (assert-equal?
+         '(() a b c)
+         (unparse-LList (swap-parts (with-output-language (LList Expr) `(a b c)))))
+       (assert-equal?
+         '(d a b c)
+         (unparse-LList (swap-parts (with-output-language (LList Expr) `(a b c . d)))))
+       (assert-equal?
+         '(f (() (() a b) (() c d)) e)
+         (unparse-LList (swap-parts (with-output-language (LList Expr) `(((a b) (c d)) e . f))))))
+
+     (test github-issue-7
+       (assert-equal?
+         'x
+         (unparse-Lx (parse-Lx 'x)))
+       (assert-equal?
+         '(lambda (x . z) x)
+         (unparse-Lx (parse-Lx '(lambda (x . z) x))))
+       (assert-equal?
+         '(lambda (x y . z) x)
+         (unparse-Lx (parse-Lx '(lambda (x y . z) x))))
+       (assert-equal?
+         '(lambda x x)
+         (unparse-Lx (parse-Lx '(lambda x x))))
+       (assert-equal?
+         '(define (x y . z) z)
+         (unparse-Lx (parse-Lx '(define (x y . z) z))))
+       (assert-equal?
+         '(define x x)
+         (unparse-Lx (parse-Lx '(define x x))))
+       (assert-equal?
+         '(define (l m . n)
+            (define g
+              (lambda (x . z)
+                (lambda (a . b)
+                  (lambda (c . d)
+                    l)))))
+         (unparse-Lx (parse-Lx '(define (l m . n)
+                                  (define g
+                                    (lambda (x . z)
+                                      (lambda (a . b)
+                                        (lambda (c . d)
+                                          l))))))))
+       (assert-equal?
+         'x
+         (unparse-Lx (with-output-language (Lx Expr) `x)))
+       (assert-equal?
+         '(lambda (x . z) x)
+         (unparse-Lx (with-output-language (Lx Expr) `(lambda (x . z) x))))
+       (assert-equal?
+         '(lambda (x y . z) x)
+         (unparse-Lx (with-output-language (Lx Expr) `(lambda (x y . z) x))))
+       (assert-equal?
+         '(define (x y . z) z)
+         (unparse-Lx (with-output-language (Lx Expr) `(define (x y . z) z))))
+       (assert-equal?
+         '(lambda x x)
+         (unparse-Lx (with-output-language (Lx Expr) `(lambda x x))))
+       (assert-equal?
+         '(define x x)
+         (unparse-Lx (with-output-language (Lx Expr) `(define x x))))
+       (assert-equal?
+         '(define (l m . n)
+            (define g
+              (lambda (x . z)
+                (lambda (a . b)
+                  (lambda (c . d)
+                    l)))))
+         (unparse-Lx (with-output-language (Lx Expr) `(define (l m . n)
+                                                        (define g
+                                                          (lambda (x . z)
+                                                            (lambda (a . b)
+                                                              (lambda (c . d)
+                                                                l))))))))
+       (assert-equal?
+         '(define f (lambda (x . y) x))
+         (unparse-Lx (Px1 (parse-Lx '(define (f x . y) x)))))
+       (assert-equal?
+         '(define g (lambda (x y z . w) w))
+         (unparse-Lx (Px1 (parse-Lx '(define (g x y z . w) w)))))
+       (assert-equal?
+         '(define h (lambda (x y . z) (define i (lambda (a b c . d) d))))
+         (unparse-Lx (Px1 (parse-Lx '(define (h x y . z) (define (i a b c . d) d))))))
+       (assert-equal?
+         '(define f (lambda x (define g (lambda y x))))
+         (unparse-Lx (Px1 (parse-Lx '(define (f . x) (define (g . y) x))))))))
 
    (define-language LMULTI
      (terminals

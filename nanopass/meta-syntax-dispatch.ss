@@ -32,12 +32,13 @@
     (lambda (e p)
       (syntax-case e ()
         [(a dots . d)
-         (ellipsis? #'dots)
+         (and (not (ellipsis? #'a)) (not (unquote? #'a)) (ellipsis? #'dots))
          (let ([first (match #'a p '())])
            (and first
                 (let ([rest (match-each #'d p)])
                   (and rest (cons (map make-nano-dots first) rest)))))]
         [(a . d)
+         (and (not (ellipsis? #'a)) (not (unquote? #'a)))
          (let ([first (match #'a p '())])
            (and first
                 (let ([rest (match-each #'d p)])
@@ -50,7 +51,7 @@
       (let f ([e e])
         (syntax-case e ()
           [(a dots . d)
-           (ellipsis? #'dots)
+           (and (not (ellipsis? #'a)) (not (unquote? #'a)) (ellipsis? #'dots))
            (let-values ([(xr* y-pat r) (f #'d)])
              (if r
                  (if (null? y-pat)
@@ -61,6 +62,7 @@
                      (values '() (cdr y-pat) (match #'a (car y-pat) r)))
                  (values #f #f #f)))]
           [(a . d)
+           (and (not (ellipsis? #'a)) (not (unquote? #'a)))
            (let-values ([(xr* y-pat r) (f #'d)])
              (if r
                  (if (null? y-pat)
@@ -76,11 +78,11 @@
     (lambda (e)
       (syntax-case e ()
         [(a dots . d)
-         (and (not (ellipsis? #'a)) (ellipsis? #'dots))
+         (and (not (ellipsis? #'a)) (not (unquote? #'a)) (ellipsis? #'dots))
          (let ([l (match-each-any #'d)])
            (and l (cons (make-nano-dots #'a) l)))]
         [(a . d)
-         (not (ellipsis? #'a))
+         (and (not (ellipsis? #'a)) (not (unquote? #'a)))
          (let ([l (match-each-any #'d)])
            (and l (cons #'a l)))]
         [() '()]

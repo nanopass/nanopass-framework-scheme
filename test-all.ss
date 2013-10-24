@@ -8,6 +8,7 @@
 (run-ensure-correct-identifiers)
 (run-maybe-tests)
 (run-maybe-dots-tests)
+(run-language-dot-support)
 (printf "Compiler loaded, running all tests (quietly)\n")
 (time
   (begin
