@@ -6,7 +6,8 @@
     echo-define-pass define-pass with-output-language nanopass-case
     language->s-expression extends entry terminals nongenerative-id
     #;define-nanopass-record-types diff-languages define-language-node-counter
-    prune-language define-pruned-language)
+    prune-language define-pruned-language
+    with-extended-quasiquote with-r6rs-quasiquote)
   (import
     (nanopass language)
     (nanopass parser)

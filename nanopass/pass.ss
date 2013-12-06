@@ -127,15 +127,15 @@
                                             [(tid xargs ...) (generate-temporaries #'(id ...))]
                                             [(id id* ...) #'(id ...)])
                                #`(let ([result #f])
-                                   (trace-let name ([tid (#,iunparser id)] [xargs id*] ...)
+                                   (trace-let name ([tid (#,iunparser id #t)] [xargs id*] ...)
                                      (let-values ([(ot xvals ...) (tpass id id* ...)])
                                        (set! result (list ot xvals ...))
-                                       (values (#,ounparser ot) xvals ...)))
+                                       (values (#,ounparser ot #t) xvals ...)))
                                    (apply values result)))
                              (with-syntax ([(xvals ...) (generate-temporaries #'(xtra ...))]
                                             [(tid xargs ...) (generate-temporaries #'(id ...))]
                                             [(id id* ...) #'(id ...)])
-                               #`(trace-let name ([tid (#,iunparser id)] [xargs id*] ...)
+                               #`(trace-let name ([tid (#,iunparser id #t)] [xargs id*] ...)
                                    (tpass id id* ...))))
                          (if ounparser
                              (with-syntax ([(ot xvals ...) (generate-temporaries #'(name xtra ...))])
@@ -143,7 +143,7 @@
                                    (trace-let name ([id id] ...)
                                      (let-values ([(ot xvals ...) (tpass id ...)])
                                        (set! result (list ot xvals ...))
-                                       (values (#,ounparser ot) xvals ...)))
+                                       (values (#,ounparser ot #t) xvals ...)))
                                    (apply values result)))
                              #`(trace-let name ([id id] ...)
                                  (tpass id ...))))))))])))
@@ -236,16 +236,16 @@
                                       #`(lambda (fml fml* ...)
                                           (let ([tproc lambda-expr])
                                             (let ([ot #f] [xrt #f] ...)
-                                              (trace-let name ([t (#,iunparser fml)] [fml* fml*] ...)
+                                              (trace-let name ([t (#,iunparser fml #t)] [fml* fml*] ...)
                                                 (let-values ([(tot txrt ...) (tproc fml fml* ...)])
                                                   (set! ot tot)
                                                   (set! xrt txrt) ...
-                                                  (values (#,ounparser tot) txrt ...)))
+                                                  (values (#,ounparser tot #t) txrt ...)))
                                               (values ot xrt ...)))))
                                     (with-syntax ([(fml fml* ...) (generate-temporaries (pdesc-fml* pdesc))])
                                       #`(lambda (fml fml* ...)
                                           (let ([tproc lambda-expr])
-                                            (trace-let name ([t (#,iunparser fml)] [fml* fml*] ...)
+                                            (trace-let name ([t (#,iunparser fml #t)] [fml* fml*] ...)
                                               (tproc fml fml* ...))))))
                                 (if ounparser
                                     (with-syntax ([(fml ...) (generate-temporaries (pdesc-fml* pdesc))]
@@ -258,7 +258,7 @@
                                                 (let-values ([(tot txrt ...) (tproc fml ...)])
                                                   (set! ot tot)
                                                   (set! xrt txrt) ...
-                                                  (values (#,ounparser tot) txrt ...)))
+                                                  (values (#,ounparser tot #t) txrt ...)))
                                               (values ot xrt ...)))))
                                     (with-syntax ([(fml ...) (generate-temporaries (pdesc-fml* pdesc))])
                                       #'(lambda (fml ...)
@@ -1366,10 +1366,12 @@
                               [* (eq? (datum *) '*) #f]
                               [id
                                (identifier? #'id)
-                               (if (or (nonterm-id->ntspec? #'id (language-ntspecs ilang))
-                                       (term-id->tspec? #'id (language-tspecs ilang)))
-                                   (syntax->datum #'id)
-                                   (squawk "unrecognized input non-terminal" #'id))]
+                               (if ilang
+                                   (if (or (nonterm-id->ntspec? #'id (language-ntspecs ilang))
+                                           (term-id->tspec? #'id (language-tspecs ilang)))
+                                       (syntax->datum #'id)
+                                       (squawk "unrecognized input non-terminal" #'id))
+                                   (squawk "specified input non-terminal without input language" #'id))]
                               [_ (squawk "invalid input type specifier" #'itype)])])
                        (let ([arg* #'(arg ...)])
                          (when maybe-itype
@@ -1396,10 +1398,12 @@
                                                 [* (eq? (datum *) '*) #f]
                                                 [id
                                                  (identifier? #'id)
-                                                 (if (or (nonterm-id->ntspec? #'id (language-ntspecs olang))
-                                                         (term-id->tspec? #'id (language-tspecs ilang)))
-                                                     (syntax->datum #'id)
-                                                     (squawk "unrecognized output non-terminal" #'id))]
+                                                 (if olang
+                                                     (if (or (nonterm-id->ntspec? #'id (language-ntspecs olang))
+                                                             (term-id->tspec? #'id (language-tspecs ilang)))
+                                                         (syntax->datum #'id)
+                                                         (squawk "unrecognized output non-terminal" #'id))
+                                                     (squawk "specified output non-terminal without output language" #'id))]
                                                 [_ (squawk "invalid output-type specifier" #'otype)])])
                              (make-pdesc #'proc-name maybe-itype fml* init*
                                maybe-otype #'(rv ...) #'(body ...) trace? echo?))))))])))))

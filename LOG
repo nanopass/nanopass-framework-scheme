@@ -681,3 +681,28 @@ LATEST
       lib/csv8.4/i3le/nanopass.so, lib/csv8.4/i3osx/nanopass.so,
       lib/csv8.4/ta6le/nanopass.so, lib/csv8.4/ta6osx/nanopass.so,
       lib/csv8.4/ti3le/nanopass.so, lib/csv8.4/ti3osx/nanopass.so
+2013-12-05 -
+  * added a with-r6rs-quasiquote and a with-extended-quasiquote forms.  the
+    r6rs version provides the normal quasiquote, while the extended version
+    includes support for ellipsis in the template (the extended quasiquote is
+    now needed for the pretty output forms).
+      nanopass.ss, nanopass/helpers.ss, nanopass/unparser.ss
+  * added a second pretty form (->) for writing procedural unparsing of
+    nonterminal productions.
+      nanopass/language.ss, nanopass/helpers.ss, nanopass.ss, nanopass/records.ss,
+      nanopass/unparser.ss
+  * changed how trace-define-pass and traced transformers work, so that the
+    tracing now outputs the raw S-expressions syntax, rather than the unparsed
+    S-expression syntax.
+      nanopass/unparser.ss
+  * fixed how the unparser handles terminals, so that they will be unparsed
+    using the pretty unparser, even when they are unparsed at the top level, if
+    they are not using the raw unparsing.
+      nanopass/unparser.ss
+  * fixed a bug in how the meta-parser generates catas so that it will now put
+    the correct type in for terminal specs. 
+      nanopass/meta-parser.ss
+  * fixed a bug in how the transformer syntax is parsed when there is no input
+    language, or when there is no output language.  (the code used to assume
+    that the language would be present, leading to unhelpful error messages.)
+      nanopass/pass.ss

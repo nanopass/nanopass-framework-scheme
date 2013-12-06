@@ -69,11 +69,12 @@
 
       (define-who fresh-alt
         (lambda (alt)
-          (cond
-            [(pair-alt? alt) (make-pair-alt (alt-syn alt) (alt-pretty alt))]
-            [(terminal-alt? alt) (make-terminal-alt (alt-syn alt) (alt-pretty alt))]
-            [(nonterminal-alt? alt) (make-nonterminal-alt (alt-syn alt) (alt-pretty alt))]
-            [else (error who "unexpected alt" alt)])))
+          ((cond
+             [(pair-alt? alt) make-pair-alt]
+             [(terminal-alt? alt) make-terminal-alt]
+             [(nonterminal-alt? alt) make-nonterminal-alt]
+             [else (error who "unexpected alt" alt)])
+            (alt-syn alt) (alt-pretty alt) (alt-pretty-procedure? alt))))
 
       (define fresh-ntspec
         (lambda (ntspec)
@@ -209,23 +210,29 @@
       (define parse-alts
         (lambda (alt* terminal-meta*)
           (define make-alt
-            (lambda (syn pretty)
+            (lambda (syn pretty pretty-procedure?)
               (syntax-case syn ()
-                [(s s* ...) (make-pair-alt #'(s s* ...) pretty)]
-                [(s s* ... . sr) (make-pair-alt #'(s s* ... . sr) pretty)]
+                [(s s* ...) (make-pair-alt #'(s s* ...) pretty pretty-procedure?)]
+                [(s s* ... . sr) (make-pair-alt #'(s s* ... . sr) pretty pretty-procedure?)]
                 [s
                  (identifier? #'s)
                  (if (memq (meta-var->raw-meta-var (syntax->datum #'s)) terminal-meta*)
-                     (make-terminal-alt #'s pretty)
-                     (make-nonterminal-alt #'s pretty))])))
+                     (make-terminal-alt #'s pretty pretty-procedure?)
+                     (make-nonterminal-alt #'s pretty pretty-procedure?))])))
           (let f ([alt* alt*])
             (syntax-case alt* ()
               [() '()]
               [((=> syn pretty) . alt*) (double-arrow? #'=>)
-               (cons (make-alt #'syn #'pretty) (f #'alt*))]
+               (cons (make-alt #'syn #'pretty #f) (f #'alt*))]
               [(syn => pretty . alt*) (double-arrow? #'=>)
-               (cons (make-alt #'syn #'pretty) (f #'alt*))]
-              [(syn . alt*) (cons (make-alt #'syn #f) (f #'alt*))]
+               (cons (make-alt #'syn #'pretty #f) (f #'alt*))]
+              [((-> syn prettyf) . alt*) (arrow? #'->)
+               (with-implicit (-> with-extended-quasiquote)
+                 (cons (make-alt #'syn #'(with-extended-quasiquote prettyf) #t) (f #'alt*)))]
+              [(syn -> prettyf . alt*) (arrow? #'->)
+               (with-implicit (-> with-extended-quasiquote)
+                 (cons (make-alt #'syn #'(with-extended-quasiquote prettyf) #t) (f #'alt*)))]
+              [(syn . alt*) (cons (make-alt #'syn #f #f) (f #'alt*))]
               [_ (syntax-violation 'define-language "unexpected alt" alt*)]))))
 
       (define parse-terms

@@ -193,7 +193,7 @@
       (syntax-case stx (unquote)
         [(unquote x)
          (if (and cata? (not (identifier? #'x)))
-             (parse-cata #'x #f maybe?)
+             (parse-cata #'x (tspec-type tname) maybe?)
              (make-nano-unquote #'x))]
         [(a . d)
          (syntax-violation 'meta-parse-term

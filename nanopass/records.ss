@@ -32,7 +32,7 @@
           ntspec-meta-parse-name ntspec-meta-pred
           ntspec-tag ntspec-all-tag ntspec-all-term-pred
 
-          alt? alt-syn alt-pretty 
+          alt? alt-syn alt-pretty alt-pretty-procedure?
           make-pair-alt pair-alt? pair-alt-pattern
           pair-alt-field-names pair-alt-field-levels pair-alt-field-maybes
           pair-alt-accessors pair-alt-implicit? pair-alt-pred pair-alt-maker
@@ -203,7 +203,7 @@
           (new name meta-vars alts #f #f #f #f #f #f #f #f #f #f #f)))))
 
   (define-record-type alt
-    (fields syn pretty)
+    (fields syn pretty pretty-procedure?)
     (nongenerative))
 
   (define-record-type pair-alt
@@ -223,8 +223,9 @@
     (sealed #t)
     (protocol
       (lambda (pargs->new)
-        (lambda (syn pretty)
-          ((pargs->new syn pretty) #f #f #f #f #f #f #f #f #f #f)))))
+        (lambda (syn pretty pretty-procedure?)
+          ((pargs->new syn pretty pretty-procedure?)
+            #f #f #f #f #f #f #f #f #f #f)))))
 
   (define-record-type terminal-alt
     (parent alt)
@@ -233,8 +234,8 @@
     (sealed #t)
     (protocol
       (lambda (pargs->new)
-        (lambda (syn pretty)
-          ((pargs->new syn pretty) #f)))))
+        (lambda (syn pretty pretty-procedure?)
+          ((pargs->new syn pretty pretty-procedure?) #f)))))
 
   (define-record-type nonterminal-alt
     (parent alt)
@@ -243,8 +244,8 @@
     (sealed #t)
     (protocol
       (lambda (pargs->new)
-        (lambda (syn pretty)
-          ((pargs->new syn pretty) #f)))))
+        (lambda (syn pretty pretty-procedure?)
+          ((pargs->new syn pretty pretty-procedure?) #f)))))
 
   (define-who spec-all-pred
     (lambda (x)

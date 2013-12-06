@@ -62,8 +62,142 @@
     np-parse-fail-token
 
     ;; handy syntactic stuff
-    with-implicit)
+    with-implicit with-r6rs-quasiquote with-extended-quasiquote extended-quasiquote with-auto-unquote)
   (import (rnrs) (nanopass implementation-helpers))
+
+  (define-syntax datum
+    (syntax-rules ()
+      [(_ e) (syntax->datum #'e)]))
+
+  (define-syntax with-r6rs-quasiquote
+    (lambda (x)
+      (syntax-case x ()
+        [(k . body)
+         (with-implicit (k quasiquote)
+           #'(let-syntax ([quasiquote (syntax-rules () [(_ x) `x])]) . body))])))
+
+  (define-syntax extended-quasiquote
+    (lambda (x)
+      (define gather-unquoted-exprs
+        (lambda (body)
+          (let f ([body body] [t* '()] [e* '()])
+            (syntax-case body (unquote unquote-splicing)
+              [(unquote x)
+               (identifier? #'x)
+               (values body (cons #'x t*) (cons #'x e*))]
+              [(unquote-splicing x)
+               (identifier? #'x)
+               (values body (cons #'x t*) (cons #'x e*))]
+              [(unquote e)
+               (with-syntax ([(t) (generate-temporaries '(t))])
+                 (values #'(unquote t) (cons #'t t*) (cons #'e e*)))]
+              [(unquote-splicing e)
+               (with-syntax ([(t) (generate-temporaries '(t))])
+                 (values #'(unquote-splicing t) (cons #'t t*) (cons #'e e*)))]
+              [(tmpl0 . tmpl1)
+               (let-values ([(tmpl0 t* e*) (f #'tmpl0 t* e*)])
+                 (let-values ([(tmpl1 t* e*) (f #'tmpl1 t* e*)])
+                   (values #`(#,tmpl0 . #,tmpl1) t* e*)))]
+              [atom (values #'atom t* e*)]))))
+      (define build-list
+        (lambda (body orig-level)
+          (let loop ([body body] [level orig-level])
+            (syntax-case body (unquote unquote-splicing)
+              [(tmpl0 ... (unquote e))
+               (with-syntax ([(tmpl0 ...) (rebuild-body #'(tmpl0 ...) (fx- orig-level 1))])
+                 (cond
+                   [(fx=? level 0) #'(tmpl0 ... (unquote e))]
+                   [(fx=? level 1) #'(tmpl0 ... (unquote-splicing e))]
+                   [else (let loop ([level level] [e #'e])
+                           (if (fx=? level 1)
+                               #`(tmpl0 ... (unquote-splicing #,e))
+                               (loop (fx- level 1) #`(apply append #,e))))]))]
+              [(tmpl0 ... (unquote-splicing e))
+               (with-syntax ([(tmpl0 ...) (rebuild-body #'(tmpl0 ...) (fx- orig-level 1))])
+                 (cond
+                   [(fx=? level 0) #'(tmpl0 ... (unquote-splicing e))]
+                   [else (let loop ([level level] [e #'e])
+                           (if (fx=? level 0)
+                               #`(tmpl0 ... (unquote-splicing #,e))
+                               (loop (fx- level 1) #`(apply append #,e))))]))]
+              [(tmpl0 ... tmpl1 ellipsis)
+               (eq? (datum ellipsis) '...)
+               (loop #'(tmpl0 ... tmpl1) (fx+ level 1))]
+              [(tmpl0 ... tmpl1)
+               (with-syntax ([(tmpl0 ...) (rebuild-body #'(tmpl0 ...) (fx- orig-level 1))])
+                 (let-values ([(tmpl1 t* e*) (gather-unquoted-exprs #'tmpl1)])
+                   (when (null? e*)
+                     (syntax-violation 'extended-quasiquote
+                       "no variables found in ellipsis expression" body))
+                   (let loop ([level level]
+                               [e #`(map (lambda #,t*
+                                           (extended-quasiquote
+                                             #,tmpl1))
+                                      . #,e*)])
+                     (if (fx=? level 1)
+                         #`(tmpl0 ... (unquote-splicing #,e))
+                         (loop (fx- level 1) #`(apply append #,e))))))]))))
+      (define rebuild-body
+        (lambda (body level)
+          (syntax-case body (unquote unquote-splicing)
+            [(unquote e) #'(unquote e)]
+            [(unquote-splicing e) #'(unquote-splicing e)]
+            [(tmpl0 ... tmpl1 ellipsis)
+             (eq? (datum ellipsis) '...)
+             (with-syntax ([(tmpl0 ...) (build-list #'(tmpl0 ... tmpl1) (fx+ level 1))])
+               #'(tmpl0 ...))]
+            [(tmpl0 ... tmpl1 ellipsis . tmpl2)
+             (eq? (datum ellipsis) '...)
+             (with-syntax ([(tmpl0 ...) (build-list #'(tmpl0 ... tmpl1) (fx+ level 1))]
+                           [tmpl2 (rebuild-body #'tmpl2 level)])
+               #'(tmpl0 ... . tmpl2))]
+            [(tmpl0 ... tmpl1)
+             (with-syntax ([(tmpl0 ...) (rebuild-body #'(tmpl0 ...) level)]
+                           [tmpl1 (rebuild-body #'tmpl1 level)])
+               #'(tmpl0 ... tmpl1))]
+            [(tmpl0 ... tmpl1 . tmpl2)
+             (with-syntax ([(tmpl0 ...) (rebuild-body #'(tmpl0 ... tmpl1) level)]
+                           [tmpl2 (rebuild-body #'tmpl2 level)])
+               #'(tmpl0 ... . tmpl2))]
+            [other #'other])))
+      (syntax-case x ()
+        [(k body)
+         (with-syntax ([body (rebuild-body #'body 0)])
+           #'(quasiquote body))])))
+
+  (define-syntax with-extended-quasiquote
+    (lambda (x)
+      (syntax-case x ()
+        [(k . body)
+         (with-implicit (k quasiquote)
+           #'(let-syntax ([quasiquote (syntax-rules ()
+                                        [(_ x) (extended-quasiquote x)])])
+               
+               . body))])))
+
+  (define-syntax with-auto-unquote
+    (lambda (x)
+      (syntax-case x ()
+        [(k (x* ...) . body)
+         (with-implicit (k quasiquote)
+           #'(let-syntax ([quasiquote
+                            (lambda (x)
+                              (define replace-vars
+                                (let ([vars (list #'x* ...)])
+                                  (lambda (b)
+                                    (let f ([b b])
+                                      (syntax-case b ()
+                                        [id (identifier? #'id)
+                                         (if (memp (lambda (var) (free-identifier=? var #'id)) vars)
+                                             #'(unquote id)
+                                             #'id)]
+                                        [(a . d) (with-syntax ([a (f #'a)] [d (f #'d)]) #'(a . d))]
+                                        [atom #'atom])))))
+                              (syntax-case x ()
+                                [(_ b)
+                                 (with-syntax ([b (replace-vars #'b)])
+                                   #'`b)]))])
+               . body))])))
 
   (define all-unique-identifiers?
     (lambda (ls)
@@ -100,10 +234,6 @@
 
   (define-auxiliary-keywords extends definitions entry terminals nongenerative-id)
 
-  (define-syntax datum
-    (syntax-rules ()
-      [(_ id) (syntax->datum #'id)]))
-
   (define-syntax define-who
     (lambda (x)
       (syntax-case x ()
@@ -128,6 +258,10 @@
   (define unquote?
     (lambda (x)
       (and (identifier? x) (free-identifier=? x (syntax unquote)))))
+
+  (define unquote-splicing?
+    (lambda (x)
+      (and (identifier? x) (free-identifier=? x (syntax unquote-splicing)))))
 
   (define plus?
     (lambda (x)
