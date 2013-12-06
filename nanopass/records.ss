@@ -649,9 +649,14 @@
                              (if (fx=? level 0)
                                  #`(lambda (x)
                                      (unless (pred? x)
-                                       (errorf who
-                                         "expected ~s but received ~s in field ~s of ~s~:[~; from ~:*~a~]"
-                                         '#,name x '#,fld '#,(alt-syn alt) #,msg)))
+                                       (let ([msg #,msg])
+                                         (if msg
+                                             (errorf who
+                                               "expected ~s but received ~s in field ~s of ~s from ~a"
+                                               '#,name x '#,fld '#,(alt-syn alt) msg)
+                                             (errorf who
+                                               "expected ~s but received ~s in field ~s of ~s"
+                                               '#,name x '#,fld '#,(alt-syn alt))))))
                                  #`(lambda (x)
                                      (for-each #,(f (fx- level 1)) x))))
                           #,fld))))))

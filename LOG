@@ -706,3 +706,8 @@ LATEST
     language, or when there is no output language.  (the code used to assume
     that the language would be present, leading to unhelpful error messages.)
       nanopass/pass.ss
+2013-12-05 -
+  * fixed a bug with how errors are reported when a language production gets
+    the wrong the value.  (Thanks to Eric Holk for pointing out the bug (and
+    the different handling of formats in Vicare).
+      nanopass/records.ss
