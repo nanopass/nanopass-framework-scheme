@@ -2,7 +2,7 @@
 ;;; See the accompanying file Copyright for detatils
 
 (library (tests unit-tests)
-  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support)
+  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests)
   (import (rnrs)
           (nanopass helpers)
           (nanopass language)
@@ -549,6 +549,59 @@
           (assert-equal?
              '(Foo 4 (Bar #f (Foo 7 #f)) (Bool #t) #f)
              (unparse-Lmaybe2 (add-one (with-output-language (Lmaybe2 Exp) `(Foo 3 (Bar #f (Foo 6 #f)) (Bool #t) #f)))))))))
+
+   (define-language LMaybeNoBool
+     (terminals
+       (symbol (x))
+       (number (n)))
+     (Expr (e)
+       (foo x (maybe n))
+       (bar (maybe e) x)
+       (num n)
+       (ref x)))
+
+   (define-language LMaybeListNoBool
+     (terminals
+       (symbol (x))
+       (number (n)))
+     (Expr (e)
+       (foo ([x (maybe n)] ...) e)
+       (bar (maybe e) ... x)
+       (num n)
+       (ref x)))
+   
+   (test-suite maybe-unparse-tests
+     (test maybe-unparse
+       (assert-equal? '(foo x 10)
+         (unparse-LMaybeNoBool
+           (with-output-language (LMaybeNoBool Expr)
+             `(foo x 10))))
+       (assert-equal? '(bar (foo x #f) x)
+         (unparse-LMaybeNoBool
+           (with-output-language (LMaybeNoBool Expr)
+             `(bar (foo x #f) x))))
+       (assert-equal? '(bar (bar (foo y #f) y) z)
+         (unparse-LMaybeNoBool
+           (with-output-language (LMaybeNoBool Expr)
+             `(bar (bar (foo y #f) y) z))))
+       (assert-equal? '(bar (bar (bar #f x) y) z)
+         (unparse-LMaybeNoBool
+           (with-output-language (LMaybeNoBool Expr)
+             `(bar (bar (bar #f x) y) z)))))
+
+     (test maybe-unparse-dots
+       (assert-equal? '(foo ([x 10] [y 12]) (ref x))
+         (unparse-LMaybeListNoBool
+           (with-output-language (LMaybeListNoBool Expr)
+             `(foo ([x 10] [y 12]) (ref x)))))
+       (assert-equal? '(foo ([x #f] [y 12] [z #f]) (ref y))
+         (unparse-LMaybeListNoBool
+           (with-output-language (LMaybeListNoBool Expr)
+             `(foo ([x #f] [y 12] [z #f]) (ref y)))))
+       (assert-equal? '(bar #f #f (num 10) (ref x) #f (foo ([x #f] [y 10] [z 5] [w #f]) (bar #f z)) #f w)
+         (unparse-LMaybeListNoBool
+           (with-output-language (LMaybeListNoBool Expr)
+             `(bar #f #f (num 10) (ref x) #f (foo ([x #f] [y 10] [z 5] [w #f]) (bar #f z)) #f w))))))
 
    ;; tests related to issue #7 on github.com
    (define-language LPairs

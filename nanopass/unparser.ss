@@ -70,8 +70,11 @@
             [oth tmpl])))
 
       (define build-accessor-expr
-        (lambda (acc level)
-          (let loop ([level level] [f #'(lambda (t) (f t raw?))])
+        (lambda (acc level maybe?)
+          (let loop ([level level] [f #`(lambda (t) 
+                                          #,(if maybe?
+                                                #'(and t (f t raw?))
+                                                #'(f t raw?)))])
             (if (fx=? level 0)
                 #`(#,f (#,acc ir))
                 (loop (fx- level 1) #`(lambda (t) (map #,f t)))))))
@@ -80,7 +83,8 @@
         (lambda (tmpl alt)
           (with-syntax ([(e ...) (map build-accessor-expr
                                    (pair-alt-accessors alt)
-                                   (pair-alt-field-levels alt))]
+                                   (pair-alt-field-levels alt)
+                                   (pair-alt-field-maybes alt))]
                         [(fld ...) (pair-alt-field-names alt)]
                         [tmpl tmpl])
             #'(let ([fld e] ...)

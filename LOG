@@ -711,3 +711,17 @@ LATEST
     the wrong the value.  (Thanks to Eric Holk for pointing out the bug (and
     the different handling of formats in Vicare).
       nanopass/records.ss
+  * built csv8.4 binaries with the current updates.
+      lib/csv8.4/a6le/nanopass.so, lib/csv8.4/a6osx/nanopass.so,
+      lib/csv8.4/i3le/nanopass.so, lib/csv8.4/i3osx/nanopass.so,
+      lib/csv8.4/ta6le/nanopass.so, lib/csv8.4/ta6osx/nanopass.so,
+      lib/csv8.4/ti3le/nanopass.so, lib/csv8.4/ti3osx/nanopass.so
+2013-12-09 -
+  * fixed a bug with the unparsing of maybe fields, with an added test to make
+    sure that we don't wreck the handling of maybe fields again.
+      nanopass/unparser.ss, test-all.ss, tests/unit-tests.ss
+  * built csv8.4 binaries with the current updates.
+      lib/csv8.4/a6le/nanopass.so, lib/csv8.4/a6osx/nanopass.so,
+      lib/csv8.4/i3le/nanopass.so, lib/csv8.4/i3osx/nanopass.so,
+      lib/csv8.4/ta6le/nanopass.so, lib/csv8.4/ta6osx/nanopass.so,
+      lib/csv8.4/ti3le/nanopass.so, lib/csv8.4/ti3osx/nanopass.so
