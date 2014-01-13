@@ -9,7 +9,7 @@ latex = pdflatex
 stexmacrofiles = 
 
 # list bibliography files here
-bib =
+bib = user-guide.bib
 
 # define index if an index is to be generated
 # index=yes
