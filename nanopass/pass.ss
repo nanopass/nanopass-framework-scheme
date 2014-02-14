@@ -20,7 +20,8 @@
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass meta-parser)
-          (rnrs mutable-pairs))
+          (rnrs mutable-pairs)
+          (only (scheme) parameterize print-gensym eq-hashtable-set! eq-hashtable-ref print-graph))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
@@ -152,10 +153,26 @@
     (syntax-rules ()
       [(_ . more) (x-define-pass . more)]))
 
-  (define-syntax echo-define-pass
+  (trace-define-syntax echo-define-pass
     (lambda (x)
+      (define parse-options
+        (lambda (body)
+          (let loop ([rest body] [defn #f] [pass-options '()])
+            (syntax-case rest ()
+              [() (if defn
+                      #`(#,pass-options #,defn)
+                      #`(#,pass-options))]
+              [((definitions . defn) . rest)
+               (eq? (datum definitions) 'definitions)
+               (loop #'rest #'(definitions . defn) pass-options)]
+              [((?pass-options ?options ...) . rest)
+               (eq? (datum ?pass-options) 'pass-options)
+               (loop #'rest defn #'(?options ...))]
+              [_ (if defn
+                     #`(#,pass-options #,defn . #,rest)
+                     #`(#,pass-options . #,rest))]))))
       (syntax-case x ()
-        [(_ name ?colon ilang (fml ...) ?arrow olang (xval ...) . more)
+        [(_ name ?colon ilang (fml ...) ?arrow olang (xval ...) . body)
          (and (identifier? #'name)
               (eq? (datum ?colon) ':)
               (or (identifier? #'ilang)
@@ -167,12 +184,36 @@
                     [(olang otype) (and (identifier? #'olang) (identifier? #'otype))]
                     [_ #f]))
               (for-all identifier? #'(fml ...)))
-         #'(x-define-pass name ?colon ilang (fml ...) ?arrow olang (xval ...)
-             (expand-modifier echo) . more)])))
+         (with-syntax ([((options ...) . body) (parse-options #'body)])
+           #'(x-define-pass name ?colon ilang (fml ...) ?arrow olang (xval ...)
+               (pass-options (echo #t) options ...) . body))])))
 
   (define-syntax x-define-pass
     (lambda (x)
       (define who 'define-pass)
+
+      (define-record-type pass-options
+        (nongenerative)
+        (fields echo? generate-transformers?)
+        (protocol
+          (lambda (new)
+            (case-lambda
+              [() (new #f #t)]
+              [(options)
+               (let loop ([options options] [echo? #f] [gt? #t])
+                 (syntax-case options ()
+                   [() (new echo? gt?)]
+                   [((?echo ?bool) . options)
+                     (and (identifier? #'?echo)
+                          (eq? (datum ?echo) 'echo)
+                          (boolean? (datum ?bool)))
+                     (loop #'options (datum ?bool) gt?)]
+                   [((?generate-transformers ?bool) . options)
+                     (and (identifier? #'?generate-transformers)
+                          (eq? (datum ?generate-transformers) 'generate-transformers)
+                          (boolean? (datum ?bool)))
+                     (loop #'options echo? (datum ?bool))]
+                   [(opt . options) (syntax-violation who "invalid pass option" x #'opt)]))]))))
 
       (define-record-type pass-desc
         (nongenerative)
@@ -193,7 +234,7 @@
               (new lhs guard id rhs-arg* rhs-lambda #f '())))))
 
       (define make-processors
-        (lambda (pass-desc maybe-imeta-parser maybe-ometa-parser)
+        (lambda (pass-desc pass-options maybe-imeta-parser maybe-ometa-parser)
           (let loop ([pdesc* (pass-desc-pdesc* pass-desc)] [processor* '()])
             (if (null? pdesc*)
                 (let ([pdesc* (let ([ls (pass-desc-pdesc* pass-desc)])
@@ -202,11 +243,11 @@
                       processor*
                       (loop pdesc* processor*)))
                 (loop (cdr pdesc*)
-                  (cons (make-processor pass-desc maybe-imeta-parser maybe-ometa-parser (car pdesc*))
+                  (cons (make-processor pass-desc pass-options maybe-imeta-parser maybe-ometa-parser (car pdesc*))
                     processor*))))))
 
       (define make-processor
-        (lambda (pass-desc maybe-imeta-parser maybe-ometa-parser pdesc)
+        (lambda (pass-desc pass-options maybe-imeta-parser maybe-ometa-parser pdesc)
           (define echo-processor
             (lambda (result)
               (when (pdesc-echo? pdesc)
@@ -215,7 +256,7 @@
                   (syntax->datum (pass-desc-name pass-desc)))
                 (pretty-print (syntax->datum result)))
               result))
-          (with-syntax ([lambda-expr (make-processor-lambda pass-desc maybe-imeta-parser maybe-ometa-parser pdesc)]
+          (with-syntax ([lambda-expr (make-processor-lambda pass-desc pass-options maybe-imeta-parser maybe-ometa-parser pdesc)]
                         [name (pdesc-name pdesc)])
             (echo-processor    
               #`(define name
@@ -268,7 +309,7 @@
                         #'lambda-expr))))))
     
       (define make-processor-lambda
-        (lambda (pass-desc maybe-imeta-parser maybe-ometa-parser pdesc)
+        (lambda (pass-desc pass-options maybe-imeta-parser maybe-ometa-parser pdesc)
           (let ([maybe-olang (pass-desc-maybe-olang pass-desc)]
                 [maybe-otype (pdesc-maybe-otype pdesc)] ; HERE
                 [tfml (car (generate-temporaries '(x)))]
@@ -292,11 +333,11 @@
                                             (values #'body #'(defn* ...))]
                                            [body (values #'body '())])])
                             #`(#,@defn*
-                                 #,(make-processor-clauses pass-desc tfml maybe-imeta-parser maybe-ometa-parser pdesc body)))
+                                 #,(make-processor-clauses pass-desc pass-options tfml maybe-imeta-parser maybe-ometa-parser pdesc body)))
                           (pdesc-body pdesc))))))))
 
       (define make-processor-clauses
-        (lambda (pass-desc tfml imeta-parser maybe-ometa-parser pdesc cl*)
+        (lambda (pass-desc pass-options tfml imeta-parser maybe-ometa-parser pdesc cl*)
           (let* ([itype (pdesc-maybe-itype pdesc)] ; HERE
                  [ilang (pass-desc-maybe-ilang pass-desc)]
                  [intspec* (language-ntspecs ilang)]
@@ -387,7 +428,7 @@
                           (if (and (nonterminal-meta? fname intspec*)
                                    (nonterminal-meta? ofname maybe-ontspec*))
                               (let ([callee-pdesc
-                                     (find-proc pass-desc (pdesc-name pdesc)
+                                     (find-proc pass-desc pass-options (pdesc-name pdesc)
                                        (syntax->datum (spec-type (find-spec fname ilang)))
                                        (syntax->datum (spec-type (find-spec ofname maybe-olang))) #t
                                        (lambda (id* dflt*)
@@ -411,7 +452,7 @@
                                                (list-tail id* n)
                                                dflt*))))))
                               (let ([callee-pdesc
-                                      (find-proc pass-desc (pdesc-name pdesc)
+                                      (find-proc pass-desc pass-options (pdesc-name pdesc)
                                         (syntax->datum (spec-type (find-spec fname ilang)))
                                         (syntax->datum (spec-type (find-spec ofname maybe-olang))) #f
                                         (lambda (id* dflt*)
@@ -476,7 +517,7 @@
                     [(nonterminal-alt? alt)
                      (build-subtype-call (syntax->datum (ntspec-name (nonterminal-alt-ntspec alt))))]
                     [(terminal-alt? alt)
-                     (let ([proc (find-proc pass-desc (pdesc-name pdesc)
+                     (let ([proc (find-proc pass-desc pass-options (pdesc-name pdesc)
                                    (syntax->datum (tspec-type (terminal-alt-tspec alt)))
                                    maybe-otype #f
                                    (lambda (id* dflt*) (fx<? (fx- (length id*) (length dflt*)) (length fml*)))
@@ -747,7 +788,7 @@
                          (define build-cata-call-1
                            (lambda (itype maybe-otype inid* outid*)
                              (build-call inid*
-                               (find-proc pass-desc (nano-cata-syntax elt) itype maybe-otype #t
+                               (find-proc pass-desc pass-options (nano-cata-syntax elt) itype maybe-otype #t
                                  (lambda (id* dflt*)
                                    (fx<? (fx- (length id*) (length dflt*)) (length inid*)))
                                  (lambda (dflt*)
@@ -788,7 +829,7 @@
                          (define build-cata-call-3
                            (lambda (itype maybe-otype t outid*)
                              (let ([callee-pdesc
-                                    (find-proc pass-desc (nano-cata-syntax elt) itype maybe-otype #t
+                                    (find-proc pass-desc pass-options (nano-cata-syntax elt) itype maybe-otype #t
                                       (lambda (id* dflt*)
                                         (for-all
                                           (lambda (req)
@@ -983,7 +1024,7 @@
              (define build-subtype-call
                (lambda (itype)
                  (build-call fml*
-                   (find-proc pass-desc (pdesc-name pdesc) itype maybe-otype #t
+                   (find-proc pass-desc pass-options (pdesc-name pdesc) itype maybe-otype #t
                      (lambda (id* dflt*) (fx<? (fx- (length id*) (length dflt*)) (length fml*)))
                      (lambda (dflt*) (fx=? (length dflt*) (length (pdesc-xval* pdesc))))))))
 
@@ -1273,26 +1314,32 @@
 
       (define find-proc
         ; will never be asked to find a proc without an itype, so itype is never #f
-        (lambda (pass-desc src-stx itype maybe-otype try-to-generate? xfmls-ok? xvals-ok?)
+        (lambda (pass-desc pass-options src-stx itype maybe-otype try-to-generate? xfmls-ok? xvals-ok?)
           (define (try-to-generate)
-            (unless (and (xfmls-ok? '() '()) (xvals-ok? '()))
-              (syntax-violation who
-                (format "cannot find a processor that accepts input type ~s and output type ~s, \
-                  and cannot generate one with extra formals or return values"
-                  itype maybe-otype)
-                (pass-desc-name pass-desc) src-stx))
-            (unless (and (nonterm-id->ntspec? itype (language-ntspecs (pass-desc-maybe-ilang pass-desc)))
-                         (nonterm-id->ntspec? maybe-otype (language-ntspecs (pass-desc-maybe-olang pass-desc))))
-              (syntax-violation who
-                (format "cannot find a processor that accepts input type ~s and output type ~s, \
-                  and cannot generate one when either the input or output type is a terminal"
-                  itype maybe-otype)
-                (pass-desc-name pass-desc) src-stx))
-            (let ([pdesc (make-pdesc (datum->syntax #'* (gensym (format "~s->~s" itype maybe-otype)))
-                           itype (list #'ir) '() maybe-otype '() '() #f #f)])
-              (pass-desc-pdesc*-set! pass-desc
-                (cons pdesc (pass-desc-pdesc* pass-desc)))
-              pdesc))
+            (if (pass-options-generate-transformers? pass-options)
+                (begin
+                  (unless (and (xfmls-ok? '() '()) (xvals-ok? '()))
+                    (syntax-violation who
+                      (format "cannot find a transformer from ~s to ~s, \
+                        and cannot generate one with extra formals or return values"
+                        itype maybe-otype)
+                      (pass-desc-name pass-desc) src-stx))
+                    (unless (and (nonterm-id->ntspec? itype (language-ntspecs (pass-desc-maybe-ilang pass-desc)))
+                                 (nonterm-id->ntspec? maybe-otype (language-ntspecs (pass-desc-maybe-olang pass-desc))))
+                      (syntax-violation who
+                        (format "cannot find a transformer from ~s to ~s, \
+                          and cannot generate one when either the input or output type is a terminal"
+                          itype maybe-otype)
+                        (pass-desc-name pass-desc) src-stx))
+                      (let ([pdesc (make-pdesc (datum->syntax #'* (gensym (format "~s->~s" itype maybe-otype)))
+                                     itype (list #'ir) '() maybe-otype '() '() #f #f)])
+                        (pass-desc-pdesc*-set! pass-desc
+                          (cons pdesc (pass-desc-pdesc* pass-desc)))
+                        pdesc))
+                    (syntax-violation who
+                      (format "cannot find a transformer from ~s to ~s that matches the expected signature"
+                        itype maybe-otype)
+                      (pass-desc-name pass-desc) src-stx)))
           (define find-subspecs
             (lambda (ospec sub-ospec*)
               (if (ntspec? ospec)
@@ -1422,7 +1469,7 @@
               (values #f #f))))
 
       (define build-checked-body
-        (lambda (pass-desc maybe-fml xval* maybe-itype maybe-otype maybe-ometa-parser maybe-body)
+        (lambda (pass-desc pass-options maybe-fml xval* maybe-itype maybe-otype maybe-ometa-parser maybe-body)
           (define generate-output-check
             (lambda (type x ntspec*)
               ((lambda (ls) (if (null? (cdr ls)) (car ls) #`(or #,@ls)))
@@ -1450,7 +1497,7 @@
                      (syntax-violation who "cannot auto-generate body without input language"
                        (pass-desc-name pass-desc)))
                    (let ([itype (or maybe-itype (syntax->datum (language-entry-ntspec ilang)))])
-                     (let ([pdesc (find-proc pass-desc (pass-desc-name pass-desc) itype maybe-otype #t
+                     (let ([pdesc (find-proc pass-desc pass-options (pass-desc-name pass-desc) itype maybe-otype #t
                                     (lambda (id* dflt*) (fx=? (length dflt*) (length id*)))
                                     (lambda (dflt*) (fxzero? (length dflt*))))])
                        (let ([init* (pdesc-dflt* pdesc)] [rv* (pdesc-xval* pdesc)])
@@ -1477,10 +1524,10 @@
                 (generate-body #f #f)))))
 
       (define do-define-pass
-        (lambda (pass-name echo? maybe-iname maybe-itype fml* maybe-oname maybe-otype xval* defn* p* maybe-body)
+        (lambda (pass-name pass-options maybe-iname maybe-itype fml* maybe-oname maybe-otype xval* defn* p* maybe-body)
           (define echo-pass
             (lambda (x)
-              (when echo?
+              (when (pass-options-echo? pass-options)
                 (printf "pass ~s expanded into:\n" (syntax->datum pass-name))
                 (pretty-print (syntax->datum x))
                 (newline))
@@ -1496,7 +1543,7 @@
                 (syntax-violation who "unrecognized pass output non-terminal" pass-name maybe-otype))
               (let* ([pdesc* (map (parse-proc pass-name maybe-ilang maybe-olang) p*)]
                      [pass-desc (make-pass-desc pass-name maybe-ilang maybe-olang pdesc*)]
-                     [body (build-checked-body pass-desc (and (pair? fml*) (car fml*))
+                     [body (build-checked-body pass-desc pass-options (and (pair? fml*) (car fml*))
                              xval* (syntax->datum maybe-itype)
                              (syntax->datum maybe-otype) maybe-ometa-parser maybe-body)])
                 (echo-pass
@@ -1506,7 +1553,7 @@
                           (define who '#,pass-name)
                           (define-nanopass-record)
                           #,@defn*
-                          #,@(make-processors pass-desc maybe-imeta-parser maybe-ometa-parser)
+                          #,@(make-processors pass-desc pass-options maybe-imeta-parser maybe-ometa-parser)
                           #,body)))))))))
 
       (syntax-case x ()
@@ -1534,9 +1581,9 @@
                                 (and (identifier? #'oname) (identifier? #'otype))
                                 (values #'oname #'otype)]
                                [_ (squawk "invalid output-language specifier" #'oname)])])
-                 (define (s1 stuff* defn* processor* echo?)
+                 (define (s1 stuff* defn* processor* pass-options)
                    (if (null? stuff*)
-                       (s2 defn* processor* #f echo?)
+                       (s2 defn* processor* #f pass-options)
                        (let ([stuff (car stuff*)])
                          (if (let processor? ([stuff stuff] [mcount 0])                        
                                (syntax-case stuff ()
@@ -1557,21 +1604,20 @@
                                        (< mcount 2))
                                   (processor? #'(?not-colon . more) (fx+ mcount 1))]
                                  [_ #f]))
-                             (s1 (cdr stuff*) defn* (cons stuff processor*) echo?)
-                             (s2 defn* processor* #`(begin #,@stuff*) echo?)))))
-                 (define (s2 defn* processor* maybe-body echo?)
-                   (do-define-pass #'pass-name echo? maybe-iname maybe-itype fml*
+                             (s1 (cdr stuff*) defn* (cons stuff processor*) pass-options)
+                             (s2 defn* processor* #`(begin #,@stuff*) pass-options)))))
+                 (define (s2 defn* processor* maybe-body pass-options)
+                   (do-define-pass #'pass-name pass-options maybe-iname maybe-itype fml*
                      maybe-oname maybe-otype #'(xval ...) defn* (reverse processor*) maybe-body))
-                 (let s0 ([stuff* #'(stuff ...)] [defn* '()] [echo? #f])
+                 (let s0 ([stuff* #'(stuff ...)] [defn* '()] [pass-options #f])
                    (if (null? stuff*)
-                       (s1 stuff* defn* '() echo?)
+                       (s1 stuff* defn* '() (or pass-options (make-pass-options)))
                        (syntax-case (car stuff*) ()
                          [(definitions defn ...)
                           (eq? (datum definitions) 'definitions)
-                          (s0 (cdr stuff*) #'(defn ...) echo?)]
-                         [(?expand-modifier ?echo)
-                          (and (eq? (datum ?expand-modifier) 'expand-modifier)
-                               (eq? (datum ?echo) 'echo))
-                          (s0 (cdr stuff*) defn* #t)]
-                         [_ (s1 stuff* defn* '() echo?)])))))))]
+                          (s0 (cdr stuff*) #'(defn ...) pass-options)]
+                         [(?pass-options . ?options)
+                          (eq? (datum ?pass-options) 'pass-options)
+                          (s0 (cdr stuff*) defn* (make-pass-options #'?options))]
+                         [_ (s1 stuff* defn* '() (or pass-options (make-pass-options)))])))))))]
         [(_ . rest) (syntax-violation who "invalid syntax" #'(define-pass . rest))]))))
