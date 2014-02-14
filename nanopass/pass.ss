@@ -153,7 +153,7 @@
     (syntax-rules ()
       [(_ . more) (x-define-pass . more)]))
 
-  (trace-define-syntax echo-define-pass
+  (define-syntax echo-define-pass
     (lambda (x)
       (define parse-options
         (lambda (body)
