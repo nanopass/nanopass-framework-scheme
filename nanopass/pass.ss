@@ -20,8 +20,7 @@
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass meta-parser)
-          (rnrs mutable-pairs)
-          (only (scheme) parameterize print-gensym eq-hashtable-set! eq-hashtable-ref print-graph))
+          (rnrs mutable-pairs))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
