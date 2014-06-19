@@ -1,5 +1,5 @@
 ;;; Copyright (c) 2000-2013 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
-;;; See the accompanying file Copyright for detatils
+;;; See the accompanying file Copyright for details
 
 (import (rnrs) (tests compiler-test) (tests helpers) (tests unit-tests) (nanopass helpers))
 

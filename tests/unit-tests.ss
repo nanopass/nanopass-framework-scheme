@@ -1,5 +1,5 @@
 ;;; Copyright (c) 2000-2013 Andrew W. Keep, R. Kent Dybvig
-;;; See the accompanying file Copyright for detatils
+;;; See the accompanying file Copyright for details
 
 (library (tests unit-tests)
   (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests)
