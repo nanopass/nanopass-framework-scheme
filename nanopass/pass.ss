@@ -1446,7 +1446,7 @@
                                                  (identifier? #'id)
                                                  (if olang
                                                      (if (or (nonterm-id->ntspec? #'id (language-ntspecs olang))
-                                                             (term-id->tspec? #'id (language-tspecs ilang)))
+                                                             (term-id->tspec? #'id (language-tspecs olang)))
                                                          (syntax->datum #'id)
                                                          (squawk "unrecognized output non-terminal" #'id))
                                                      (squawk "specified output non-terminal without output language" #'id))]
