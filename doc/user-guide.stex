@@ -299,7 +299,7 @@ primitive handling in the example compiler.}
 Our example compiler also limits the constants that can be expressed to a subset of those allowed by Scheme.
 The \scheme{constant?} predicate limits these to booleans (\scheme{#t} and
 \scheme{#f}), null (\scheme{()}), and appropriately sized integers
-(between $-2^60$ and $2^60 - 1$).
+(between $-2^{60}$ and $2^{60} - 1$).
 
 {\small
 \schemedisplay
