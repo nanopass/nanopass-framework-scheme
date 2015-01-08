@@ -349,7 +349,7 @@
             (define parse-clauses
               (lambda (cl*)
                 (define nano-meta->fml*
-                  (lambda (nm)
+                  (lambda (cl nm)
                     (let f ([nrec* (nano-meta-fields nm)] [fml* '()])
                       (fold-right
                         (rec g
@@ -376,12 +376,12 @@
                                      fml*))]
                               [(nano-meta? nrec) (f (nano-meta-fields nrec) fml*)]
                               [(list? nrec) (f nrec fml*)]
-                              [(nano-quote? nrec) (syntax-violation who "quoted terminals currently unsupported in match patterns" (nano-quote-x nrec))]
+                              [(nano-quote? nrec) (syntax-violation who "quoted terminals currently unsupported in match patterns" (nano-quote-x nrec) cl)]
                               [else (error who "unrecognized nano-rec" nrec)])))
                         fml* nrec*))))
-                (define (helper lhs guard rhs rhs*)
+                (define (helper cl lhs guard rhs rhs*)
                   (let ([nano-meta (imeta-parser itype lhs #t)])
-                    (let ([fml* (nano-meta->fml* nano-meta)])
+                    (let ([fml* (nano-meta->fml* cl nano-meta)])
                       (unless (all-unique-identifiers? fml*)
                         (syntax-violation who "pattern binds one or more identifiers more then once" lhs))
                       (make-pclause nano-meta guard
@@ -397,9 +397,9 @@
                            #'else-th #'(lambda () (begin rhs0 rhs1 ...)))]
                         [[lhs (guard g0 g1 ...) rhs0 rhs1 ...]
                          (f (cdr cl*)
-                            (cons (helper #'lhs #'(and g0 g1 ...) #'rhs0 #'(rhs1  ...)) pclause*))]
+                            (cons (helper (car cl*) #'lhs #'(and g0 g1 ...) #'rhs0 #'(rhs1  ...)) pclause*))]
                         [[lhs rhs0 rhs1 ...]
-                         (f (cdr cl*) (cons (helper #'lhs #t #'rhs0 #'(rhs1  ...)) pclause*))]
+                         (f (cdr cl*) (cons (helper (car cl*) #'lhs #t #'rhs0 #'(rhs1  ...)) pclause*))]
                         [_ (syntax-violation (syntax->datum (pass-desc-name pass-desc))
                              "invalid processor clause" (pdesc-name pdesc) (car cl*))])))))
             (module (make-clause generate-system-clauses)
