@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2013 Andrew W. Keep
+;;; Copyright (c) 2000-2015 Andrew W. Keep
 ;;; See the accompanying file Copyright for details
 
 (library (nanopass language-node-counter)

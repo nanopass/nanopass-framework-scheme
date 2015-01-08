@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2013 Andrew W. Keep, R. Kent Dybvig
+;;; Copyright (c) 2000-2015 Andrew W. Keep, R. Kent Dybvig
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-test-helpers)
