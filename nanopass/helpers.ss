@@ -4,7 +4,7 @@
 (library (nanopass helpers)
   (export
     ;; auxiliary keywords for language/pass definitions
-    extends definitions entry terminals nongenerative-id
+    extends definitions entry terminals nongenerative-id maybe
 
     ;; predicates for looking for identifiers independent of context
     ellipsis? unquote? colon? arrow? plus? minus? double-arrow? 
@@ -232,7 +232,7 @@
        (begin
          (define-auxiliary-keyword name*) ...)]))
 
-  (define-auxiliary-keywords extends definitions entry terminals nongenerative-id)
+  (define-auxiliary-keywords extends definitions entry terminals nongenerative-id maybe)
 
   (define-syntax define-who
     (lambda (x)
