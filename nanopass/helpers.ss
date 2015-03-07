@@ -8,17 +8,17 @@
 
     ;; predicates for looking for identifiers independent of context
     ellipsis? unquote? colon? arrow? plus? minus? double-arrow? 
-    
+
     ;; things for dealing with syntax and idetnfieris
-    all-unique-identifiers? construct-id gentemp bound-id-member? bound-id-union
-    partition-syn datum 
+    all-unique-identifiers? construct-id construct-unique-id gentemp
+    bound-id-member? bound-id-union partition-syn datum 
 
     ;; things for dealing with language meta-variables
-    meta-var->raw-meta-var combine unique-symbol 
-    
+    meta-var->raw-meta-var combine unique-name
+
     ;; convenience syntactic forms
     rec with-values define-who 
-    
+
     ;; source information funtions
     syntax->source-info 
 
@@ -32,7 +32,7 @@
 
     ;; gensym stuff (related to nongenerative languages)
     gensym regensym
- 
+
     ;; library export stuff (needed for when used inside module to
     ;; auto-indirect export things)
     indirect-export
@@ -51,7 +51,7 @@
 
     ;; debugging support
     trace-lambda trace-define-syntax trace-let trace-define
-          
+
     ;; needed to know what code to generate
     optimize-level
 
@@ -62,7 +62,8 @@
     np-parse-fail-token
 
     ;; handy syntactic stuff
-    with-implicit with-r6rs-quasiquote with-extended-quasiquote extended-quasiquote with-auto-unquote)
+    with-implicit with-r6rs-quasiquote with-extended-quasiquote
+    extended-quasiquote with-auto-unquote)
   (import (rnrs) (nanopass implementation-helpers))
 
   (define-syntax datum
@@ -128,12 +129,12 @@
                  (let-values ([(tmpl1 t* e*) (gather-unquoted-exprs #'tmpl1)])
                    (when (null? e*)
                      (syntax-violation 'extended-quasiquote
-                       "no variables found in ellipsis expression" body))
+                                       "no variables found in ellipsis expression" body))
                    (let loop ([level level]
-                               [e #`(map (lambda #,t*
-                                           (extended-quasiquote
-                                             #,tmpl1))
-                                      . #,e*)])
+                              [e #`(map (lambda #,t*
+                                          (extended-quasiquote
+                                            #,tmpl1))
+                                        . #,e*)])
                      (if (fx=? level 1)
                          #`(tmpl0 ... (unquote-splicing #,e))
                          (loop (fx- level 1) #`(apply append #,e))))))]))))
@@ -172,7 +173,7 @@
          (with-implicit (k quasiquote)
            #'(let-syntax ([quasiquote (syntax-rules ()
                                         [(_ x) (extended-quasiquote x)])])
-               
+
                . body))])))
 
   (define-syntax with-auto-unquote
@@ -181,22 +182,22 @@
         [(k (x* ...) . body)
          (with-implicit (k quasiquote)
            #'(let-syntax ([quasiquote
-                            (lambda (x)
-                              (define replace-vars
-                                (let ([vars (list #'x* ...)])
-                                  (lambda (b)
-                                    (let f ([b b])
-                                      (syntax-case b ()
-                                        [id (identifier? #'id)
-                                         (if (memp (lambda (var) (free-identifier=? var #'id)) vars)
-                                             #'(unquote id)
-                                             #'id)]
-                                        [(a . d) (with-syntax ([a (f #'a)] [d (f #'d)]) #'(a . d))]
-                                        [atom #'atom])))))
-                              (syntax-case x ()
-                                [(_ b)
-                                 (with-syntax ([b (replace-vars #'b)])
-                                   #'`b)]))])
+                           (lambda (x)
+                             (define replace-vars
+                               (let ([vars (list #'x* ...)])
+                                 (lambda (b)
+                                   (let f ([b b])
+                                     (syntax-case b ()
+                                       [id (identifier? #'id)
+                                        (if (memp (lambda (var) (free-identifier=? var #'id)) vars)
+                                            #'(unquote id)
+                                            #'id)]
+                                       [(a . d) (with-syntax ([a (f #'a)] [d (f #'d)]) #'(a . d))]
+                                       [atom #'atom])))))
+                             (syntax-case x ()
+                               [(_ b)
+                                (with-syntax ([b (replace-vars #'b)])
+                                  #'`b)]))])
                . body))])))
 
   (define all-unique-identifiers?
@@ -225,12 +226,11 @@
        (define-syntax name 
          (lambda (x)
            (syntax-violation 'name "misplaced use of auxiliary keyword" x)))]))
-  
+
   (define-syntax define-auxiliary-keywords
     (syntax-rules ()
       [(_ name* ...)
-       (begin
-         (define-auxiliary-keyword name*) ...)]))
+       (begin (define-auxiliary-keyword name*) ...)]))
 
   (define-auxiliary-keywords extends definitions entry terminals nongenerative-id)
 
@@ -249,7 +249,7 @@
       (if (null? (car r*))
           r
           (cons (map car r*) (combine (map cdr r*) r))))) 
-  
+
   ;;; moved from meta-syntax-dispatch.ss and syntaxconvert.ss
   (define ellipsis?
     (lambda (x)
@@ -293,26 +293,25 @@
            (or (free-identifier=? x #'->)
                (eq? (syntax->datum x) '->)))))
 
-  ;;; unique-symbol produces a unique name derived the input name by
+  ;;; unique-name produces a unique name derived the input name by
   ;;; adding a unique suffix of the form .<digit>+.  creating a unique
   ;;; name from a unique name has the effect of replacing the old
   ;;; unique suffix with a new one.
-  
+
   (define unique-suffix
     (let ((count 0))
       (lambda ()
         (set! count (+ count 1))
         (number->string count))))
-  
-  (define unique-symbol
+
+  (define unique-name
     (lambda (id . id*)
-      (string->symbol
-        (string-append
-          (fold-right
-            (lambda (id str) (string-append str ":" (symbol->string (syntax->datum id))))
-            (symbol->string (syntax->datum id)) id*)
-          "."
-          (unique-suffix)))))
+      (string-append
+        (fold-right
+          (lambda (id str) (string-append str ":" (symbol->string (syntax->datum id))))
+          (symbol->string (syntax->datum id)) id*)
+        "."
+        (unique-suffix))))
 
   ; TODO: at some point we may want this to be a little bit more
   ; sophisticated, or we may want to have something like a regular
@@ -324,10 +323,9 @@
         (let f ([i (fx- (string-length s) 1)])
           (cond
             [(fx=? i -1) sym]
-            [(or 
-               (char=? #\* (string-ref s i))
-               (char=? #\^ (string-ref s i))
-               (char=? #\? (string-ref s i)))
+            [(or (char=? #\* (string-ref s i))
+                 (char=? #\^ (string-ref s i))
+                 (char=? #\? (string-ref s i)))
              (f (fx- i 1))]
             [else (let f ([i i])
                     (cond
@@ -335,21 +333,30 @@
                       [(char-numeric? (string-ref s i)) (f (fx- i 1))]
                       [else (string->symbol (substring s 0 (fx+ i 1)))]))])))))
 
-  ;; This concatenates two identifiers with a string inbetween like "-"
-  (define construct-id
-    (lambda (tid x . x*)
+  (define build-id
+    (lambda (who x x*)
       (define ->str
         (lambda (x)
           (cond
             [(string? x) x]
             [(identifier? x) (symbol->string (syntax->datum x))]
             [(symbol? x) (symbol->string x)]
-            [else (error 'construct-id "invalid input ~s" x)])))
-        (unless (identifier? tid)
-          (error 'construct-id "template argument ~s is not an identifier" tid))
-        (datum->syntax 
-          tid 
-          (string->symbol (apply string-append (->str x) (map ->str x*))))))
+            [else (error who "invalid input ~s" x)])))
+      (apply string-append (->str x) (map ->str x*))))
+
+  (define $construct-id
+    (lambda (who str->sym tid x x*)
+      (unless (identifier? tid)
+        (error who "template argument ~s is not an identifier" tid))
+      (datum->syntax tid (str->sym (build-id who x x*)))))
+
+  (define-who construct-id
+    (lambda (tid x . x*)
+      ($construct-id who string->symbol tid x x*)))
+
+  (define-who construct-unique-id
+    (lambda (tid x . x*)
+      ($construct-id who gensym tid x x*)))
 
   (define-syntax partition-syn
     (lambda (x)
@@ -377,24 +384,24 @@
                                                   "no home for ~s"
                                                   (car ls))]))))])
                e0 e1 ...))])))
-  
+
   (define gentemp
     (lambda ()
       (car (generate-temporaries '(#'t))))) 
-  
+
   (define bound-id-member? 
     (lambda (id id*)
       (and (not (null? id*))
            (or (bound-identifier=? id (car id*))
                (bound-id-member? id (cdr id*)))))) 
-  
+
   (define bound-id-union ; seems to be unneeded
     (lambda (ls1 ls2)
       (cond
         [(null? ls1) ls2]
         [(bound-id-member? (car ls1) ls2) (bound-id-union (cdr ls1) ls2)]
         [else (cons (car ls1) (bound-id-union (cdr ls1) ls2))]))) 
-  
+
   (define syntax->source-info
     (lambda (stx)
       (let ([si (syntax->source-information stx)])
@@ -403,18 +410,18 @@
                [(and (source-information-position-line si)
                      (source-information-position-column si))
                 (format "~s line ~s, char ~s of ~a"
-                  (source-information-type si)
-                  (source-information-position-line si)
-                  (source-information-position-column si)
-                  (source-information-source-file si))]
+                        (source-information-type si)
+                        (source-information-position-line si)
+                        (source-information-position-column si)
+                        (source-information-source-file si))]
                [(source-information-byte-offset-start si)
                 (format "~s byte position ~s of ~a"
-                  (source-information-type si)
-                  (source-information-byte-offset-start si)
-                  (source-information-source-file si))]
+                        (source-information-type si)
+                        (source-information-byte-offset-start si)
+                        (source-information-source-file si))]
                [(source-information-char-offset-start si)
                 (format "~s character position ~s of ~a"
-                  (source-information-type si)
-                  (source-information-char-offset-start si)
-                  (source-information-source-file si))]
+                        (source-information-type si)
+                        (source-information-char-offset-start si)
+                        (source-information-source-file si))]
                [else (format "in ~a" (source-information-source-file si))]))))))

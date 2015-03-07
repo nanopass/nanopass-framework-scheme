@@ -338,7 +338,6 @@
           (with-syntax ([(records ...) (language->lang-records desc)]
                         [(predicates ...) (language->lang-predicates desc)]
                         [unparser-name (construct-id id "unparse-" lang)]
-                        [unparser (make-unparser desc)]
                         [meta-parser (make-meta-parser desc)])
             #;(pretty-print (list 'unparser (syntax->datum lang) (syntax->datum #'unparser)))
             #;(pretty-print (list 'meta-parser (syntax->datum lang) (syntax->datum #'meta-parser)))
@@ -349,7 +348,7 @@
                   (make-compile-time-value
                     (cons '#,desc meta-parser)))
                 #;(define-property #,lang meta-parser-property meta-parser)
-                (define-who unparser-name unparser)))))
+                (define-unparser unparser-name #,lang)))))
 
       (syntax-case x ()
         [(_ ?L ?rest ...)
