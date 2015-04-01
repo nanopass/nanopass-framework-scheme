@@ -877,7 +877,7 @@ forms.
 The \scheme{Lsrc} language, for example, will bind the identifier
 \scheme{Lsrc} to the language definition, produce an unparser named
 \scheme{unparse-Lsrc}, and create two predicates, \scheme{Lsrc?} and
-\scheme{Lsrc:Expr?}. 
+\scheme{Lsrc-Expr?}.
 The language definition is used when the \var{language-name} is specified as
 the base of a new language definition and in the definition of a pass.
 
