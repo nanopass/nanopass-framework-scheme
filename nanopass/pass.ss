@@ -619,13 +619,13 @@
                             (lambda (ibinding)
                               (syntax-case ibinding ()
                                 [(id expr)
-                                  (if (and (identifier? #'expr) (eq? map-t #'expr))
-                                      #`(id #,ls-t)
-                                      #`(id (map (lambda (#,map-t)
-                                                   #,(if (null? tbinding*) 
-                                                         #'expr
-                                                         #`(let* #,tbinding* expr)))
-                                              #,ls-t)))]))
+                                 (if (and (identifier? #'expr) (eq? map-t #'expr))
+                                     #`(id #,ls-t)
+                                     #`(id (map (lambda (#,map-t)
+                                                  #,(if (null? tbinding*) 
+                                                        #'expr
+                                                        #`(let* #,tbinding* expr)))
+                                                #,ls-t)))]))
                             ibinding*)
                           (map
                             (lambda (obinding)
@@ -635,14 +635,14 @@
                               ;; place.
                               (syntax-case obinding ()
                                 [(ids (procexpr var args ...)) ;; contains expr itself
-                                  #`(ids ((let ([p (let ([p procexpr]) (lambda (m) (p m args ...)))])
-                                            (lambda (x)
-                                              #,(cond
-                                                  [(null? #'ids) #'(begin (for-each p x) (values))]
-                                                  [(null? (cdr #'ids)) #'(map p x)]
-                                                  [else (gen-mvmap (pass-desc-name pass-desc)
-                                                          #'ids #'p #'x)])))
-                                           var))]))
+                                 #`(ids ((let ([p (let ([p procexpr]) (lambda (m) (p m args ...)))])
+                                           (lambda (x)
+                                             #,(cond
+                                                 [(null? #'ids) #'(begin (for-each p x) (values))]
+                                                 [(null? (cdr #'ids)) #'(map p x)]
+                                                 [else (gen-mvmap (pass-desc-name pass-desc)
+                                                                  #'ids #'p #'x)])))
+                                         var))]))
                             obinding*)))))))
 
               (define process-nano-list
@@ -1431,7 +1431,7 @@
                                                [id
                                                 (identifier? #'id)
                                                 (if dflt?
-                                                    (squawk "missing default value" #'id)
+                                                    (squawk "unexpected non-default formal after start of default formals" #'id)
                                                     (let-values ([(fml* init*) (f (cdr arg*) #f)])
                                                       (values (cons #'id fml*) init*)))]
                                                [[id expr]
