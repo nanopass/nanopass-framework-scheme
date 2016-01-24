@@ -1,0 +1,31 @@
+language: c
+
+os:
+  - linux
+  - osx
+
+env:
+  - PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig:$PKG_CONFIG_PATH"
+  - SCHEME=chez
+  - SCHEME=ikarus
+  - SCHEME=vicare
+
+addons:
+  apt:
+    packages:
+      - libncurses5-dev
+      - libgmp-dev
+      - libffi-dev
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update             ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install libffi     ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gmp        ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install autoconf   ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install automake   ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install libtool    ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install pkg-config ; fi
+  - ./travis/install_scheme
+
+script:
+  .travis/run_tests
