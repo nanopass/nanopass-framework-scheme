@@ -25,7 +25,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install automake   ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install libtool    ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install pkg-config ; fi
-  - ./travis/install_scheme
+  - ./.travis/install_scheme
 
 script:
   .travis/run_tests
