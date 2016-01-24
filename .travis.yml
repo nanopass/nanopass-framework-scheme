@@ -5,10 +5,12 @@ os:
   - osx
 
 env:
-  - PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig:$PKG_CONFIG_PATH"
-  - SCHEME=chez
-  - SCHEME=ikarus
-  - SCHEME=vicare
+  global:
+    - PKG_CONFIG_PATH="/usr/local/opt/libffi/lib/pkgconfig:$PKG_CONFIG_PATH"
+  matrix:
+    - SCHEME=chez
+    - SCHEME=ikarus
+    - SCHEME=vicare
 
 addons:
   apt:
