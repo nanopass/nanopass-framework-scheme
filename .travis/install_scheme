@@ -6,15 +6,15 @@ ARCH=$(uname -m)
 function retrieve_file {
   URL=$1
   FN=$2
-  GET=`which curl`
+  GET=`which wget`
   if test $? -eq 0 ; then
-    echo curl -o $FN $URL
-    curl -o $FN $URL
+    echo wget -O $FN $URL
+    wget -O $FN $URL
   else
-    GET=`which wget`
+    GET=`which curl`
     if test $? -eq 0 ; then
-      echo wget -O $FN $URL
-      wget -O $FN $URL
+      echo curl -o $FN $URL
+      curl -o $FN $URL
       echo "install requires curl or wget to pull tools"
     fi
   fi
