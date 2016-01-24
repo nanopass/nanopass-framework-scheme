@@ -26,7 +26,6 @@ function install_vicare {
   VICARE_VERSION="${VICARE_BASE_VERSION}pre4"
   VICARE_FILE="vicare-scheme-${VICARE_VERSION}.tar.xz"
   VICARE_URL="${VICARE_BASE}/${VICARE_FILE}"
-  TMPDIR=$(mktemp -d vicareXXXXXX)
 
   case $OS in
     Linux) ;;
@@ -44,13 +43,9 @@ function install_vicare {
   make
   make install
   popd  # vicare-scheme-${VICARE_BASE_VERSION}
-  popd  # $TMPDIR
-  rm -rf $TMPDIR
 }
 
 function install_ikarus {
-  TMPDIR=$(mktemp -d ikarusXXXXXX)
-
   case $ARCH in
     i386|i686) BITS=32 ;;
     x86_64|amd64) BITS=64 ;;
@@ -63,7 +58,6 @@ function install_ikarus {
     *) echo "unexpected operating system $OS" ; exit 1 ;;
   esac
 
-  pushd $TMPDIR
   bzr branch lp:ikarus
   pushd ikarus
   ./configure --prefix=$PREFIX \
@@ -72,8 +66,6 @@ function install_ikarus {
   make
   make install
   popd # ikarus
-  popd  # $TMPDIR
-  rm -rf $TMPDIR
 }
 
 function install_chez {
@@ -94,9 +86,6 @@ function install_chez {
 
   CHEZ_FILE="pcsv${CHEZ_VERSION}-${CHEZ_ARCH}${CHEZ_OS}.tar.gz"
 
-  TMDPIR=$(mktemp -d chezXXXXXX)
-  pushd $TMPDIR
-
   retrieve_file "${BASE_URL}/${CHEZ_FILE}" ${CHEZ_FILE}
   
   tar zxf $CHEZ_FILE
@@ -105,8 +94,6 @@ function install_chez {
   make
   make install
   popd  # "csv${CHEZ_VERSION}/custom"
-  popd  # $TMPDIR
-  rm -rf $TMPDIR
 }
 
 case $SCHEME in
