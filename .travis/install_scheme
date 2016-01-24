@@ -32,7 +32,6 @@ function install_vicare {
     *) echo "unexpected operating system $OS" ; exit 1 ;;
   esac 
 
-  pushd $TMDIR
   retrieve_file ${VICARE_URL} ${VICARE_FILE}
 
   xzcat ${VICARE_FILE} | tar xf -
@@ -41,7 +40,7 @@ function install_vicare {
 
   ./configure --enable-posix --with-libffi
   make
-  make install
+  sudo make install
   popd  # vicare-scheme-${VICARE_BASE_VERSION}
 }
 
@@ -64,7 +63,7 @@ function install_ikarus {
     CFLAGS="-m${BITS} `pkg-config --cflags libffi` -I/usr/local/opt/gmp/include" \
     LDFLAGS="-m${BITS} `pkg-config --libs libffi` -L/usr/local/opt/gmp/lib"
   make
-  make install
+  sudo make install
   popd # ikarus
 }
 
@@ -92,7 +91,7 @@ function install_chez {
   pushd "csv${CHEZ_VERSION}/custom"
   ./configure --installprefix=$PREFIX --installman=$PREFIX/man
   make
-  make install
+  sudo make install
   popd  # "csv${CHEZ_VERSION}/custom"
 }
 
@@ -102,5 +101,3 @@ case $SCHEME in
   chez) install_chez ;;
   *) echo "Please set the SCHEME environment variable to one of: vicare, ikarus, or chez before running" ; exit 1;;
 esac
-
-
