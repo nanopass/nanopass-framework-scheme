@@ -8,16 +8,16 @@ function retrieve_file {
   FN=$2
   GET=`which curl`
   if test $? -eq 0 ; then
+    echo curl -o $FN $URL
     curl -o $FN $URL
   else
     GET=`which wget`
     if test $? -eq 0 ; then
+      echo wget -O $FN $URL
       wget -O $FN $URL
       echo "install requires curl or wget to pull tools"
     fi
   fi
-
-  echo $GET $URL
 }
 
 function install_vicare {
