@@ -268,7 +268,6 @@
           (unparse-LBoolLambda
             (parse-LBoolLambda '(lambda (f) (not (f #f)))))))))
 
-
    (define datum?
      (lambda (x)
        (or (number? x) (string? x) (symbol? x)

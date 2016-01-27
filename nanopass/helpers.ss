@@ -63,7 +63,11 @@
 
     ;; handy syntactic stuff
     with-implicit with-r6rs-quasiquote with-extended-quasiquote
-    extended-quasiquote with-auto-unquote)
+    extended-quasiquote with-auto-unquote
+
+    ;; abstraction of the grabbing the syntactic environment that will work in
+    ;; Chez, Ikarus, & Vicare
+    with-compile-time-environment)
   (import (rnrs) (nanopass implementation-helpers))
 
   (define-syntax datum

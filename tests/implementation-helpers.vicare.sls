@@ -3,7 +3,7 @@
 
 (library (tests implementation-helpers)
   (export time printf system interpret pretty-print format)
-  (import (vicare) (only (vicare posix) system))
+  (import (vicare))
   
   (library 
     (nanopass testing-environment)
@@ -16,4 +16,7 @@
 
   (define interpret
     (lambda (src)
-      (eval src (environment '(nanopass testing-environment))))))
+      (eval src (environment '(nanopass testing-environment)))))
+  (define system
+    (lambda (arg)
+      (foreign-call "system" arg))))

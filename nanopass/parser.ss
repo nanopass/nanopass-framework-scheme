@@ -34,7 +34,7 @@
               (cons name-sym (construct-unique-id tid "parse-" name-sym))))))
       (define make-parser
         (lambda (parser-name lang trace?)
-          (lambda (r)
+          (with-compile-time-environment (r)
             (let ([who (if trace? 'trace-define-parser 'define-parser)]
                   [desc-pair (guard (c [else #f]) (r lang))])
               (unless desc-pair

@@ -26,7 +26,7 @@
     indirect-export
 
     ;; compile-time environment helpers
-    #;define-property make-compile-time-value
+    #;define-property (rename (make-expand-time-value make-compile-time-value))
 
     ;; code organization helpers
     module
@@ -52,6 +52,10 @@
     ;; handy syntactic stuff
     with-implicit
 
+    ;; abstraction of the grabbing the syntactic environment that will work in
+    ;; Chez, Ikarus, & Vicare
+    with-compile-time-environment
+
     ;; apparently not neeaded (or no longer needed)
     ; scheme-version= scheme-version< scheme-version> scheme-version>=
     ; scheme-version<= with-scheme-version gensym? errorf with-output-to-string
@@ -59,9 +63,8 @@
     )
   (import
     (vicare)
-    (rename
-      (only (vicare system $compiler) $optimize-level)
-      ($optimize-level optimize-level)))
+    (only (vicare expander) stx? stx-expr)
+    (only (vicare compiler) optimize-level))
 
   (define-syntax with-implicit
     (syntax-rules ()
@@ -137,8 +140,8 @@
     (lambda (stx)
       (let loop ([stx stx] [type 'at])
         (cond
-          [(syntax-object? stx)
-           (let ([e (syntax-object-expression stx)])
+          [(stx? stx)
+           (let ([e (stx-expr stx)])
              (and (annotation? e) (make-source-information e type)))]
           [(pair? stx) (or (loop (car stx) 'near) (loop (cdr stx) 'near))]
           [else #f]))))
@@ -153,4 +156,9 @@
   
   (define-syntax indirect-export
     (syntax-rules ()
-      [(_ id indirect-id ...) (define t (if #f #f))])))
+      [(_ id indirect-id ...) (define t (if #f #f))]))
+
+  (define-syntax with-compile-time-environment
+    (syntax-rules ()
+     [(_ (arg) body* ... body)
+      (let ([arg retrieve-expand-time-value]) body* ... body)])))

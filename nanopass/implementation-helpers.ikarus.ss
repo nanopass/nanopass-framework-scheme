@@ -55,6 +55,10 @@
     ;; handy syntactic stuff
     with-implicit
 
+    ;; abstraction of the grabbing the syntactic environment that will work in
+    ;; Chez, Ikarus, & Vicare
+    with-compile-time-environment
+
     ;; apparently not neeaded (or no longer needed)
     ; scheme-version= scheme-version< scheme-version> scheme-version>=
     ; scheme-version<= with-scheme-version gensym? errorf with-output-to-string
@@ -168,5 +172,6 @@
     (syntax-rules ()
       [(_ id indirect-id ...) (define t (if #f #f))]))
 
-  )
-
+  (define-syntax with-compile-time-environment
+    (syntax-rules ()
+      [(_ (arg) body* ... body) (lambda (arg) body* ... body)])))

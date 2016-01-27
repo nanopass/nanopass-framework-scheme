@@ -43,7 +43,7 @@
 
   (define-syntax with-output-language
     (lambda (x)
-      (lambda (r)
+      (with-compile-time-environment (r)
         (syntax-case x ()
           [(id (lang type) b b* ...)
            (let* ([olang-pair (r #'lang)]
@@ -1531,7 +1531,7 @@
                 (pretty-print (syntax->datum x))
                 (newline))
               x))
-         (lambda (r)
+         (with-compile-time-environment (r)
             #;(unless (and maybe-iname (not (null? fml*)))
               (syntax-violation who "can't yet handle \"*\" iname" pass-name))
             (let-values ([(maybe-ilang maybe-imeta-parser) (lookup-lang pass-name r maybe-iname)]

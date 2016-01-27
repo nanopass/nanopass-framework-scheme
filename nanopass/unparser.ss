@@ -143,7 +143,7 @@
       (syntax-case x ()
         [(_ name lang)
          (and (identifier? #'name) (identifier? #'lang))
-         (lambda (r)
+         (with-compile-time-environment (r)
            (let ([l-pair (r #'lang)])
              (unless (pair? l-pair)
                (syntax-violation 'define-unparser "unknown language" #'lang x))

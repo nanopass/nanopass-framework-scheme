@@ -143,32 +143,31 @@
     (fields name entry-ntspec tspecs ntspecs (mutable rtd) (mutable rcd) (mutable tag-mask) nongenerative-id)
     (nongenerative)
     (protocol
-      (let ()
-        (define check-meta!
-          (let ()
-            (define (spec-meta-vars spec) (if (ntspec? spec) (ntspec-meta-vars spec) (tspec-meta-vars spec)))
-            (define (spec-name spec) (if (ntspec? spec) (ntspec-name spec) (tspec-type spec)))
-            (lambda (lang-name tspecs ntspecs)
-              (let f ([specs (append tspecs ntspecs)])
-                (unless (null? specs)
-                  (let ([test-spec (car specs)])
-                    (for-each
-                      (lambda (mv)
-                        (let ([mv-sym (syntax->datum mv)])
-                          (for-each
-                            (lambda (spec)
-                              (when (memq mv-sym (syntax->datum (spec-meta-vars spec)))
-                                (syntax-violation 'define-language
-                                  (format "the forms ~s and ~s in language ~s uses the same meta-variable"
-                                    (syntax->datum (spec-name test-spec))
-                                    (syntax->datum (spec-name spec)) (syntax->datum lang-name))
-                                  mv)))
-                            (cdr specs))))
-                      (spec-meta-vars test-spec))))))))
-        (lambda (new)
-          (lambda (name entry-ntspec tspecs ntspecs nongen-id)
-            (check-meta! name tspecs ntspecs)
-            (new name entry-ntspec tspecs ntspecs #f #f #f nongen-id))))))
+      (lambda (new)
+        (lambda (name entry-ntspec tspecs ntspecs nongen-id)
+          (define check-meta!
+            (let ()
+              (define (spec-meta-vars spec) (if (ntspec? spec) (ntspec-meta-vars spec) (tspec-meta-vars spec)))
+              (define (spec-name spec) (if (ntspec? spec) (ntspec-name spec) (tspec-type spec)))
+              (lambda (lang-name tspecs ntspecs)
+                (let f ([specs (append tspecs ntspecs)])
+                  (unless (null? specs)
+                    (let ([test-spec (car specs)])
+                      (for-each
+                        (lambda (mv)
+                          (let ([mv-sym (syntax->datum mv)])
+                            (for-each
+                              (lambda (spec)
+                                (when (memq mv-sym (syntax->datum (spec-meta-vars spec)))
+                                  (syntax-violation 'define-language
+                                    (format "the forms ~s and ~s in language ~s uses the same meta-variable"
+                                      (syntax->datum (spec-name test-spec))
+                                      (syntax->datum (spec-name spec)) (syntax->datum lang-name))
+                                    mv)))
+                              (cdr specs))))
+                        (spec-meta-vars test-spec))))))))
+          (check-meta! name tspecs ntspecs)
+          (new name entry-ntspec tspecs ntspecs #f #f #f nongen-id)))))
 
   (define-record-type tspec 
     (fields meta-vars type handler (mutable pred) (mutable tag) (mutable parent?))
