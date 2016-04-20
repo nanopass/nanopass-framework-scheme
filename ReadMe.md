@@ -1,5 +1,6 @@
-Nanopass Compiler Library
+Nanopass Compiler Library 
 ==========================
+[![Build Status](https://travis-ci.org/nanopass/nanopass-framework-scheme.svg?branch=master)](https://travis-ci.org/nanopass/nanopass-framework-scheme)
 
 This repositiory contains an R6RS version of the Nanopass Compiler Infrastructure
 described in \[1, 2, 3, 4\], along with the beginnings of a test compiler for the
