@@ -20,7 +20,8 @@
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass meta-parser)
-          (rnrs mutable-pairs))
+          (rnrs mutable-pairs)
+          (only (chezscheme) fprintf))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
@@ -405,6 +406,7 @@
             (module (make-clause generate-system-clauses)
               (define make-system-clause
                 (lambda (alt)
+                  ;; NB: can be reworked to use build-call?
                   (define genmap
                     (lambda (proc level maybe? arg args)
                       (define add-maybe
@@ -424,23 +426,24 @@
                     (lambda (in-altsyn in-altrec out-altrec)
                       (define process-alt-field
                         (lambda (level maybe? fname aname ofname)
-                          (if (and (nonterminal-meta? fname intspec*)
-                                   (nonterminal-meta? ofname maybe-ontspec*))
-                              (let ([callee-pdesc
-                                     (find-proc pass-desc pass-options (pdesc-name pdesc)
-                                       (syntax->datum (spec-type (find-spec fname ilang)))
-                                       (syntax->datum (spec-type (find-spec ofname maybe-olang))) #t
-                                       (lambda (id* dflt*)
-                                         (for-all
-                                           (lambda (req)
-                                             (memp (lambda (x) (bound-identifier=? req x)) fml*))
-                                           (list-head id* (fx- (length id*) (length dflt*)))))
-                                       (lambda (dflt*)
-                                         ; punting when there are return values for now
-                                         (null? dflt*)))])
+                          (let ([callee-pdesc
+                                 (find-proc pass-desc pass-options (pdesc-name pdesc)
+                                   (syntax->datum (spec-type (find-spec fname ilang)))
+                                   (syntax->datum (spec-type (find-spec ofname maybe-olang)))
+                                   (and (nonterminal-meta? fname intspec*)
+                                        (nonterminal-meta? ofname maybe-ontspec*))
+                                   (lambda (id* dflt*)
+                                     (for-all
+                                       (lambda (req)
+                                         (memp (lambda (x) (bound-identifier=? req x)) fml*))
+                                       (list-head id* (fx- (length id*) (length dflt*)))))
+                                   (lambda (dflt*)
+                                     ; punting when there are return values for now
+                                     (null? dflt*)))])
+                            (if callee-pdesc
                                 (genmap (pdesc-name callee-pdesc) level maybe? #`(#,aname #,fml)
                                   (let ([id* (cdr (pdesc-fml* callee-pdesc))]
-                                        [dflt* (pdesc-dflt* callee-pdesc)])
+                                         [dflt* (pdesc-dflt* callee-pdesc)])
                                     (let ([n (fx- (length id*) (length dflt*))])
                                       #`(#,@(list-head id* n)
                                           #,@(map (lambda (id dflt)
@@ -449,41 +452,16 @@
                                                         id
                                                         dflt))
                                                (list-tail id* n)
-                                               dflt*))))))
-                              (let ([callee-pdesc
-                                      (find-proc pass-desc pass-options (pdesc-name pdesc)
-                                        (syntax->datum (spec-type (find-spec fname ilang)))
-                                        (syntax->datum (spec-type (find-spec ofname maybe-olang))) #f
-                                        (lambda (id* dflt*)
-                                          (for-all
-                                            (lambda (req)
-                                              (memp (lambda (x) (bound-identifier=? req x)) fml*))
-                                            (list-head id* (fx- (length id*) (length dflt*)))))
-                                        (lambda (dflt*)
-                                          ; punting when there are return values for now
-                                          (null? dflt*)))])
-                                (if callee-pdesc
-                                    (genmap (pdesc-name callee-pdesc) level maybe? #`(#,aname #,fml)
-                                      (let ([id* (cdr (pdesc-fml* callee-pdesc))]
-                                             [dflt* (pdesc-dflt* callee-pdesc)])
-                                        (let ([n (fx- (length id*) (length dflt*))])
-                                          #`(#,@(list-head id* n)
-                                              #,@(map (lambda (id dflt)
-                                                        (if (memp (lambda (x) (bound-identifier=? id x))
-                                                              (cdr fml*))
-                                                            id
-                                                            dflt))
-                                                   (list-tail id* n)
-                                                   dflt*)))))
-                                    (begin
-                                      (when (or (nonterminal-meta? fname intspec*)
-                                                (nonterminal-meta? ofname maybe-ontspec*))
-                                        (syntax-violation who
-                                          (format "unable to automatically translate ~s in ~s to ~s in ~s"
-                                            (syntax->datum fname) (syntax->datum (alt-syn in-altrec))
-                                            (syntax->datum ofname) (syntax->datum (alt-syn out-altrec)))
-                                          (pass-desc-name pass-desc) (pdesc-name pdesc)))
-                                      #`(#,aname #,fml)))))))
+                                               dflt*)))))
+                                (begin
+                                  (when (or (nonterminal-meta? fname intspec*)
+                                            (nonterminal-meta? ofname maybe-ontspec*))
+                                    (syntax-violation who
+                                      (format "unable to automatically translate ~s in ~s to ~s in ~s"
+                                        (syntax->datum fname) (syntax->datum (alt-syn in-altrec))
+                                        (syntax->datum ofname) (syntax->datum (alt-syn out-altrec)))
+                                      (pass-desc-name pass-desc) (pdesc-name pdesc)))
+                                  #`(#,aname #,fml))))))
                       (cond
                         [(pair-alt? in-altrec)
                          (let* ([in-field-level* (pair-alt-field-levels in-altrec)]
@@ -519,10 +497,18 @@
                      (let ([proc (find-proc pass-desc pass-options (pdesc-name pdesc)
                                    (syntax->datum (tspec-type (terminal-alt-tspec alt)))
                                    maybe-otype #f
-                                   (lambda (id* dflt*) (fx<? (fx- (length id*) (length dflt*)) (length fml*)))
-                                   (lambda (dflt*) (fx=? (length dflt*) (length (pdesc-xval* pdesc)))))]
+                                   (lambda (id* dflt*)
+                                     (for-all
+                                       (lambda (req)
+                                         (memp (lambda (x) (bound-identifier=? req x)) fml*))
+                                       (list-head id* (fx- (length id*) (length dflt*)))))
+                                   (lambda (dflt*)
+                                     ; punting when there are return values for now
+                                     (null? dflt*)))]
                            [xval* (pdesc-xval* pdesc)])
-                       (let ([alt-code (if proc (build-call fml* proc) fml)])
+                       (let ([alt-code (if proc 
+                                           (build-call (cons (car fml*) (cdr (pdesc-fml* proc))) proc)
+                                           fml)])
                          (if (null? xval*)
                              alt-code
                              #`(values #,alt-code #,@xval*))))]
@@ -838,23 +824,7 @@
                                         (fx=? (length dflt*)
                                           (let ([len (length outid*)])
                                             (if maybe-otype (fx- len 1) len)))))])
-                               (let ([id* (cdr (pdesc-fml* callee-pdesc))]
-                                     [dflt* (pdesc-dflt* callee-pdesc)])
-                                 (with-syntax ([(earg* ...)
-                                                (let ([n (fx- (length id*) (length dflt*))])
-                                                  #`(#,@(list-head id* n)
-                                                      #,@(map (lambda (id dflt)
-                                                                (if (memp (lambda (x) (bound-identifier=? id x))
-                                                                      fml*)
-                                                                    id dflt))
-                                                           (list-tail id* n)
-                                                           dflt*)))])
-                                   (if maybe?
-                                       (with-syntax ([(t* ...) (generate-temporaries #'(earg* ...))])
-                                         #`((lambda (#,t t* ...)
-                                              (and #,t (#,(pdesc-name callee-pdesc) #,t t* ...)))
-                                            #,t earg* ...))
-                                       #`(#,(pdesc-name callee-pdesc) #,t earg* ...)))))))
+                               (build-call (cons t (cdr (pdesc-fml* callee-pdesc))) callee-pdesc maybe?))))
                          ; check number of arguments when we have a maybe
                          (when (and maybe? (not (fx=? (length outid*) 1)))
                            (syntax-violation who
@@ -1022,10 +992,17 @@
 
              (define build-subtype-call
                (lambda (itype)
-                 (build-call fml*
-                   (find-proc pass-desc pass-options (pdesc-name pdesc) itype maybe-otype #t
-                     (lambda (id* dflt*) (fx<? (fx- (length id*) (length dflt*)) (length fml*)))
-                     (lambda (dflt*) (fx=? (length dflt*) (length (pdesc-xval* pdesc))))))))
+                 (let ([callee-pdesc
+                        (find-proc pass-desc pass-options (pdesc-name pdesc) itype maybe-otype #t
+                          (lambda (id* dflt*)
+                            (for-all
+                              (lambda (req)
+                                (memp (lambda (x) (bound-identifier=? req x)) fml*))
+                              (list-head id* (fx- (length id*) (length dflt*)))))
+                          (lambda (dflt*)
+                            ; punting when there are return values for now
+                            (null? dflt*)))])
+                   (build-call (cons (car fml*) (cdr (pdesc-fml* callee-pdesc))) callee-pdesc))))
 
               (define make-clause
                 (lambda (alt pclause* else-id)
@@ -1468,7 +1445,7 @@
               (values #f #f))))
 
       (define build-checked-body
-        (lambda (pass-desc pass-options maybe-fml xval* maybe-itype maybe-otype maybe-ometa-parser maybe-body)
+        (lambda (pass-desc pass-options maybe-fml extra-fml* xval* maybe-itype maybe-otype maybe-ometa-parser maybe-body)
           (define generate-output-check
             (lambda (type x ntspec*)
               ((lambda (ls) (if (null? (cdr ls)) (car ls) #`(or #,@ls)))
@@ -1497,14 +1474,31 @@
                        (pass-desc-name pass-desc)))
                    (let ([itype (or maybe-itype (syntax->datum (language-entry-ntspec ilang)))])
                      (let ([pdesc (find-proc pass-desc pass-options (pass-desc-name pass-desc) itype maybe-otype #t
-                                    (lambda (id* dflt*) (fx=? (length dflt*) (length id*)))
-                                    (lambda (dflt*) (fxzero? (length dflt*))))])
-                       (let ([init* (pdesc-dflt* pdesc)] [rv* (pdesc-xval* pdesc)])
-                         (if (null? rv*)
-                             #`(#,(pdesc-name pdesc) #,maybe-fml #,@init*)
-                             #`(let-values ([(result #,@(map (lambda (x) (gensym "rv")) rv*))
-                                             (#,(pdesc-name pdesc) #,maybe-fml #,@init*)])
-                                 result))))))])))
+                                    (lambda (id* dflt*)
+                                      (for-all
+                                        (lambda (req)
+                                          (memp (lambda (x) (bound-identifier=? req x)) extra-fml*))
+                                        (list-head id* (fx- (length id*) (length dflt*)))))
+                                    (lambda (dflt*)
+                                      ; punting when there are return values for now --- matches rejecting auto generation when xval* is not null
+                                      (null? dflt*)))])
+                       (let ([id* (cdr (pdesc-fml* pdesc))]
+                             [dflt* (pdesc-dflt* pdesc)]
+                             [rv* (pdesc-xval* pdesc)])
+                         (with-syntax ([(earg* ...)
+                                        (let ([n (fx- (length id*) (length dflt*))])
+                                          #`(#,@(list-head id* n)
+                                              #,@(map (lambda (id dflt)
+                                                        (if (memp (lambda (x) (bound-identifier=? id x))
+                                                              extra-fml*)
+                                                            id dflt))
+                                                   (list-tail id* n)
+                                                   dflt*)))])
+                           (if (null? rv*)
+                               #`(#,(pdesc-name pdesc) #,maybe-fml earg* ...)
+                               #`(let-values ([(result #,@(map (lambda (x) (gensym "rv")) rv*))
+                                                (#,(pdesc-name pdesc) #,maybe-fml earg* ...)])
+                                   result)))))))])))
           (let ([olang (pass-desc-maybe-olang pass-desc)])
             (if olang
                 (let ([otype (or maybe-otype (syntax->datum (language-entry-ntspec olang)))])
@@ -1542,7 +1536,7 @@
                 (syntax-violation who "unrecognized pass output non-terminal" pass-name maybe-otype))
               (let* ([pdesc* (map (parse-proc pass-name maybe-ilang maybe-olang) p*)]
                      [pass-desc (make-pass-desc pass-name maybe-ilang maybe-olang pdesc*)]
-                     [body (build-checked-body pass-desc pass-options (and (pair? fml*) (car fml*))
+                     [body (build-checked-body pass-desc pass-options (and (pair? fml*) (car fml*)) (if (pair? fml*) (cdr fml*) '())
                              xval* (syntax->datum maybe-itype)
                              (syntax->datum maybe-otype) maybe-ometa-parser maybe-body)])
                 (echo-pass

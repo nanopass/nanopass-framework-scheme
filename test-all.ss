@@ -10,6 +10,7 @@
 (run-maybe-dots-tests)
 (run-maybe-unparse-tests)
 (run-language-dot-support)
+(run-argument-name-matching)
 (printf "Compiler loaded, running all tests (quietly)\n")
 (time
   (begin

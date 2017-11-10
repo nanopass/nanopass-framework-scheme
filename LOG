@@ -725,3 +725,10 @@ LATEST
       lib/csv8.4/i3le/nanopass.so, lib/csv8.4/i3osx/nanopass.so,
       lib/csv8.4/ta6le/nanopass.so, lib/csv8.4/ta6osx/nanopass.so,
       lib/csv8.4/ti3le/nanopass.so, lib/csv8.4/ti3osx/nanopass.so
+2017-11-09 -
+  * fixed bug in handling of extra arguments for terminal subtypes, nonterminal
+    subtypes, and pass bodies.  Previously all three of these cases simply
+    looked for a processor that did not require more extra arguments than we
+    had available, and supplied them in positional order, instead of using
+    names like the cata-morphism or normal pair-alt production processing.
+      nanopass/pass.ss, tests/unit-test.ss, test-all.ss

@@ -2,7 +2,7 @@
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-tests)
-  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests)
+  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests run-argument-name-matching)
   (import (rnrs)
           (nanopass helpers)
           (nanopass language)
@@ -847,9 +847,104 @@
      (CaseLambdaClause (cl)
        (clause (x ...) e)))
 
-
    #;(test-suite error-messages
      (
                ))
 
+   ;; regression test for error reported by R. Kent Dybvig:
+
+   (define-language L
+     (terminals
+       (symbol (x)))
+     (A (a) b)
+     (B (b) x))
+
+   (define-pass P1 : L (ir) -> L ()
+     (A : A (ir foo bar ignore) -> A ())
+     (B : B (ir foo bar) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (A ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P2 : L (ir) -> L ()
+     (A : A (ir foo bar ignore) -> A ())
+     (B : B (ir bar) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (A ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P3 : L (ir) -> L ()
+     (A : A (ir xxfoo xxbar ignore) -> A ())
+     (B : B (ir foo bar) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (B2 : B (ir) -> B ()
+       [else (printf "calling B2\n") ir])
+     (A ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P4 : L (ir) -> L ()
+     (B : B (ir foo bar ignore) -> B ())
+     (symbol : symbol (ir foo bar) -> symbol ()
+       (printf "bar = ~s\n" bar)
+       ir)
+     (B ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P5 : L (ir) -> L ()
+     (B : B (ir foo bar ignore) -> B ())
+     (symbol : symbol (ir bar) -> symbol ()
+       (printf "bar = ~s\n" bar)
+       ir)
+     (B ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P6 : L (ir) -> L ()
+     (B : B (ir foo bar ignore) -> B ())
+     (symbol : symbol (ir xxfoo xxbar) -> symbol ()
+       (printf "bar = ~s\n" xxbar)
+       ir)
+     (symbol2 : symbol (ir) -> symbol ()
+       (printf "calling symbol2\n")
+       ir)
+     (B ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P7 : L (ir foo bar ignore) -> L ()
+     (A : A (ir foo bar) -> A ()
+       [else (printf "bar = ~s\n" bar) ir]))
+
+   (define-pass P8 : L (ir foo bar ignore) -> L ()
+     (A : A (ir bar) -> A ()
+       [else (printf "bar = ~s\n" bar) ir]))
+
+   (define-pass P9 : L (ir foo bar ignore) -> L ()
+     (A : A (ir xxfoo xxbar) -> A ())
+     (A2 : A (ir) -> A ()
+       [else (printf "calling A2\n") ir]))
+
+   (test-suite argument-name-matching
+     (test sub-nonterminal-regression
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P1 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P2 'q))))
+       (assert-equal?
+         "calling B2\n"
+         (with-output-to-string (lambda () (P3 'q)))))
+     (test sub-terminal-regression
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P4 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P5 'q))))
+       (assert-equal?
+         "calling symbol2\n"
+         (with-output-to-string (lambda () (P6 'q)))))
+     (test sub-terminal-regression
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P7 'q "I am not bar" "I am bar" "extra stuff"))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P8 'q "I am not bar" "I am bar" "extra stuff"))))
+       (assert-equal?
+         "calling A2\n"
+         (with-output-to-string (lambda () (P9 'q "I am not bar" "I am bar" "extra stuff"))))))
    )
