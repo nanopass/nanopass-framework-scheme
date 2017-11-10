@@ -20,8 +20,7 @@
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass meta-parser)
-          (rnrs mutable-pairs)
-          (only (chezscheme) fprintf))
+          (rnrs mutable-pairs))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
@@ -494,24 +493,20 @@
                     [(nonterminal-alt? alt)
                      (build-subtype-call (syntax->datum (ntspec-name (nonterminal-alt-ntspec alt))))]
                     [(terminal-alt? alt)
-                     (let ([proc (find-proc pass-desc pass-options (pdesc-name pdesc)
-                                   (syntax->datum (tspec-type (terminal-alt-tspec alt)))
-                                   maybe-otype #f
-                                   (lambda (id* dflt*)
-                                     (for-all
-                                       (lambda (req)
-                                         (memp (lambda (x) (bound-identifier=? req x)) fml*))
-                                       (list-head id* (fx- (length id*) (length dflt*)))))
-                                   (lambda (dflt*)
-                                     ; punting when there are return values for now
-                                     (null? dflt*)))]
-                           [xval* (pdesc-xval* pdesc)])
-                       (let ([alt-code (if proc 
-                                           (build-call (cons (car fml*) (cdr (pdesc-fml* proc))) proc)
-                                           fml)])
-                         (if (null? xval*)
-                             alt-code
-                             #`(values #,alt-code #,@xval*))))]
+                     (let ([xval* (pdesc-xval* pdesc)])
+                       (let ([proc (find-proc pass-desc pass-options (pdesc-name pdesc)
+                                     (syntax->datum (tspec-type (terminal-alt-tspec alt)))
+                                     maybe-otype #f
+                                     (lambda (id* dflt*)
+                                       (for-all
+                                         (lambda (req)
+                                           (memp (lambda (x) (bound-identifier=? req x)) fml*))
+                                         (list-head id* (fx- (length id*) (length dflt*)))))
+                                     (lambda (dflt*) (fx=? (length dflt*) (length xval*))))])
+                         (cond
+                           [proc (build-call (cons (car fml*) (cdr (pdesc-fml* proc))) proc)]
+                           [(null? xval*) fml]
+                           [else #`(values #,fml #,@xval*)])))]
                     [else
                      (let ([alt-syntax (alt-syn alt)])
                        (let ([oalt (exists-alt? alt (nonterm-id->ntspec who maybe-otype maybe-ontspec*))])
@@ -999,9 +994,7 @@
                               (lambda (req)
                                 (memp (lambda (x) (bound-identifier=? req x)) fml*))
                               (list-head id* (fx- (length id*) (length dflt*)))))
-                          (lambda (dflt*)
-                            ; punting when there are return values for now
-                            (null? dflt*)))])
+                          (lambda (dflt*) (fx=? (length dflt*) (length (pdesc-xval* pdesc)))))])
                    (build-call (cons (car fml*) (cdr (pdesc-fml* callee-pdesc))) callee-pdesc))))
 
               (define make-clause

@@ -732,3 +732,12 @@ LATEST
     had available, and supplied them in positional order, instead of using
     names like the cata-morphism or normal pair-alt production processing.
       nanopass/pass.ss, tests/unit-test.ss, test-all.ss
+2017-11-10 -
+  * fixed a bug introduced by the last bug check that was leading to an
+    erroneous change in generation of terminal and nonterminal subtype calls
+    when there were additional return values.  Also fixed a bug with the
+    handling of terminal subtype calls (these originally looked for a processor
+    that could return multiple values and then produced a values return that
+    added effectively had a multi-valued first element (which would have lead
+    to run time errors).
+      nanopass/pass.ss
