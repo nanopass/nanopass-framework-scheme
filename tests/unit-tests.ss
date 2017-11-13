@@ -880,20 +880,26 @@
      (A ir "I am not bar" "I am bar" "extra stuff"))
 
    (define-pass P4 : L (ir) -> L ()
+     (A : A (ir) -> A ())
+     (B : B (ir [foo "I am not bar"] [bar "I am bar"]) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (A ir))
+
+   (define-pass P5 : L (ir) -> L ()
      (B : B (ir foo bar ignore) -> B ())
      (symbol : symbol (ir foo bar) -> symbol ()
        (printf "bar = ~s\n" bar)
        ir)
      (B ir "I am not bar" "I am bar" "extra stuff"))
 
-   (define-pass P5 : L (ir) -> L ()
+   (define-pass P6 : L (ir) -> L ()
      (B : B (ir foo bar ignore) -> B ())
      (symbol : symbol (ir bar) -> symbol ()
        (printf "bar = ~s\n" bar)
        ir)
      (B ir "I am not bar" "I am bar" "extra stuff"))
 
-   (define-pass P6 : L (ir) -> L ()
+   (define-pass P7 : L (ir) -> L ()
      (B : B (ir foo bar ignore) -> B ())
      (symbol : symbol (ir xxfoo xxbar) -> symbol ()
        (printf "bar = ~s\n" xxbar)
@@ -903,18 +909,29 @@
        ir)
      (B ir "I am not bar" "I am bar" "extra stuff"))
 
-   (define-pass P7 : L (ir foo bar ignore) -> L ()
+   (define-pass P8 : L (ir) -> L ()
+     (B : B (ir) -> B ())
+     (symbol : symbol (ir [foo "I am not bar"] [bar "I am bar"]) -> symbol ()
+       (printf "bar = ~s\n" bar)
+       ir)
+     (B ir))
+
+   (define-pass P9 : L (ir foo bar ignore) -> L ()
      (A : A (ir foo bar) -> A ()
        [else (printf "bar = ~s\n" bar) ir]))
 
-   (define-pass P8 : L (ir foo bar ignore) -> L ()
+   (define-pass P10 : L (ir foo bar ignore) -> L ()
      (A : A (ir bar) -> A ()
        [else (printf "bar = ~s\n" bar) ir]))
 
-   (define-pass P9 : L (ir foo bar ignore) -> L ()
+   (define-pass P11 : L (ir foo bar ignore) -> L ()
      (A : A (ir xxfoo xxbar) -> A ())
      (A2 : A (ir) -> A ()
        [else (printf "calling A2\n") ir]))
+
+   (define-pass P12 : L (ir) -> L ()
+     (A : A (ir [foo "I am not bar"] [bar "I am bar"]) -> A ()
+       [else (printf "bar = ~s\n" bar) ir]))
 
    (test-suite argument-name-matching
      (test sub-nonterminal-regression
@@ -926,25 +943,38 @@
          (with-output-to-string (lambda () (P2 'q))))
        (assert-equal?
          "calling B2\n"
-         (with-output-to-string (lambda () (P3 'q)))))
-     (test sub-terminal-regression
+         (with-output-to-string (lambda () (P3 'q))))
        (assert-equal?
          "bar = \"I am bar\"\n"
-         (with-output-to-string (lambda () (P4 'q))))
+         (with-output-to-string (lambda () (P4 'q)))))
+     (test sub-terminal-regression
        (assert-equal?
          "bar = \"I am bar\"\n"
          (with-output-to-string (lambda () (P5 'q))))
        (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P6 'q))))
+       (assert-equal?
          "calling symbol2\n"
-         (with-output-to-string (lambda () (P6 'q)))))
+         (with-output-to-string (lambda () (P7 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P8 'q)))))
      (test sub-terminal-regression
        (assert-equal?
          "bar = \"I am bar\"\n"
-         (with-output-to-string (lambda () (P7 'q "I am not bar" "I am bar" "extra stuff"))))
+         (with-output-to-string
+           (lambda () (P9 'q "I am not bar" "I am bar" "extra stuff"))))
        (assert-equal?
          "bar = \"I am bar\"\n"
-         (with-output-to-string (lambda () (P8 'q "I am not bar" "I am bar" "extra stuff"))))
+         (with-output-to-string
+           (lambda () (P10 'q "I am not bar" "I am bar" "extra stuff"))))
        (assert-equal?
          "calling A2\n"
-         (with-output-to-string (lambda () (P9 'q "I am not bar" "I am bar" "extra stuff"))))))
+         (with-output-to-string
+           (lambda () (P11 'q "I am not bar" "I am bar" "extra stuff"))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string
+           (lambda () (P12 'q))))))
    )
