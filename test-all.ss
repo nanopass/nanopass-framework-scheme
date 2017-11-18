@@ -11,6 +11,7 @@
 (run-maybe-unparse-tests)
 (run-language-dot-support)
 (run-argument-name-matching)
+(run-error-messages)
 (printf "Compiler loaded, running all tests (quietly)\n")
 (time
   (begin

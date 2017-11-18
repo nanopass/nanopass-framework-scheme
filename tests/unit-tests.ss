@@ -2,7 +2,9 @@
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-tests)
-  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests run-argument-name-matching)
+  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests
+    run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests
+    run-argument-name-matching run-error-messages)
   (import (rnrs)
           (nanopass helpers)
           (nanopass language)
@@ -847,9 +849,27 @@
      (CaseLambdaClause (cl)
        (clause (x ...) e)))
 
-   #;(test-suite error-messages
-     (
-               ))
+   (define-language L-error
+     (terminals
+       (symbol (x)))
+     (Expr (e body)
+       x
+       (lambda (x* ...) body* ... body)
+       (let ([x* e*] ...) body* ... body)
+       (let-values ([(x** ...) e*] ...) body* ... body)
+       (e e* ...)))
+
+   (test-suite error-messages
+     (test run-time-error-messages
+       (assert-error
+         "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression (quote x) at character position 31678 of tests/unit-tests.ss"
+         (with-output-language (L-error Expr)
+           `(lambda (,'x ...) z)))
+       (assert-error
+         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at character position 32021 of tests/unit-tests.ss"
+         (with-output-language (L-error Expr)
+           `(let-values ([(,'x** ...) ,'(y)] ...) z)))
+       ))
 
    ;; regression test for error reported by R. Kent Dybvig:
 

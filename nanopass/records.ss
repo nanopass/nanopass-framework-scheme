@@ -631,6 +631,11 @@
                               (syntax->datum (language-name lang)))
                             fld)])
                   (lambda (pred? name)
+                    (define (build-list-of-string level name)
+                      (let loop ([level level] [str ""])
+                        (if (fx=? level 0)
+                            (string-append str (symbol->string (syntax->datum name)))
+                            (loop (fx- level 1) (string-append str "list of ")))))
                     (with-syntax ([pred? (if maybe?
                                              #`(lambda (x) (or (eq? x #f) (#,pred? x)))
                                              pred?)])
@@ -647,7 +652,21 @@
                                                "expected ~s but received ~s in field ~s of ~s"
                                                '#,name x '#,fld '#,(alt-syn alt))))))
                                  #`(lambda (x)
-                                     (for-each #,(f (fx- level 1)) x))))
+                                     (let loop ([x x])
+                                       (cond
+                                         [(pair? x)
+                                          (#,(f (fx- level 1)) (car x))
+                                          (loop (cdr x))]
+                                         [(null? x)]
+                                         [else
+                                          (let ([msg #,msg])
+                                            (if msg
+                                                (errorf who
+                                                  "expected ~a but recieved ~s in field ~s of ~s from ~a"
+                                                  #,(build-list-of-string level name) x '#,fld '#,(alt-syn alt) msg)
+                                                (errorf who
+                                                  "expected ~a but recieved ~s in field ~s of ~s"
+                                                  #,(build-list-of-string level name) x '#,fld '#,(alt-syn alt))))])))))
                           #,fld))))))
             (with-syntax ([(fld ...) (pair-alt-field-names alt)])
               (with-syntax ([(msg ...) (generate-temporaries #'(fld ...))]

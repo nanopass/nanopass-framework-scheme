@@ -2,8 +2,8 @@
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-test-helpers)
-  (export test-suite test assert-equal? with-output-to-string)
-  (import (rnrs) (tests unit-test-helpers-implementation))
+  (export test-suite test assert-equal? assert-error with-output-to-string)
+  (import (rnrs) (tests unit-test-helpers-implementation) (only (nanopass helpers) errorf))
   
   (define-syntax test-suite
     (lambda (x)
@@ -75,25 +75,23 @@
       [(_ ?msg ?expr)
        (let ([msg ?msg])
          (guard (e [else
-                    (let ([e-msg
-                           (or (and (format-condition? e)
-                                    (apply format (condition-message e)
-                                           (condition-irritants e)))
-                               (and (message-condition? e)
-                                    (string=? msg (condition-message e))))])
+                    (let ([e-msg (with-output-to-string
+                                   (lambda ()
+                                     (display-condition e)))])
                       (or (string=? msg e-msg)
-                          #t
-                          (raise (condition
-                                   (make-format-condition)
-                                   (make-message-condition
-                                     "expected error message of ~s but got ~s")
-                                   (make-irritants (list msg e-mesg))
-                                   e))))])
+                          (begin
+                            (newline)
+                            (display "!!! expected error message ")
+                            (write msg)
+                            (display " does not match ")
+                            (write e-msg)
+                            (newline)
+                            #f)))])
            (let ([t ?expr])
-             (raise
-               (condition
-                 (make-format-condition)
-                 (make-message-condition
-                   "exptected error with message of ~s but instead got result ~s")
-                 (make-irritants (list msg t)))))))])))
-
+             (newline)
+             (display "!!! expected error with message ")
+             (write msg)
+             (display " but got result ")
+             (write t)
+             (newline)
+             #f)))])))
