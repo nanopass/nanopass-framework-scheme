@@ -89,10 +89,14 @@
             (syntax-case body (unquote unquote-splicing)
               [(unquote x)
                (identifier? #'x)
-               (values body (cons #'x t*) (cons #'x e*))]
+               (if (memp (lambda (t) (bound-identifier=? t #'x)) t*)
+                   (values body t* e*)
+                   (values body (cons #'x t*) (cons #'x e*)))]
               [(unquote-splicing x)
                (identifier? #'x)
-               (values body (cons #'x t*) (cons #'x e*))]
+               (if (memp (lambda (t) (bound-identifier=? t #'x)) t*)
+                   (values body t* e*)
+                   (values body (cons #'x t*) (cons #'x e*)))]
               [(unquote e)
                (with-syntax ([(t) (generate-temporaries '(t))])
                  (values #'(unquote t) (cons #'t t*) (cons #'e e*)))]
