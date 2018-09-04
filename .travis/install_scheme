@@ -22,7 +22,7 @@ function retrieve_file {
 
 function install_vicare {
   VICARE_BASE="https://bitbucket.org/marcomaggi/vicare-scheme/downloads"
-  VICARE_VERSION="0.4.1-devel.3"
+  VICARE_VERSION="0.4d1"
   VICARE_FILE="vicare-scheme-${VICARE_VERSION}.tar.xz"
   VICARE_URL="${VICARE_BASE}/${VICARE_FILE}"
 
