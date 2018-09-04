@@ -35,12 +35,12 @@ function install_vicare {
 
   xzcat ${VICARE_FILE} | tar xf -
 
-  pushd "vicare-scheme-${VICARE_BASE_VERSION}"
+  pushd "vicare-scheme-${VICARE_VERSION}"
 
   ./configure --enable-posix --with-libffi
   make
   sudo make install
-  popd  # vicare-scheme-${VICARE_BASE_VERSION}
+  popd  # vicare-scheme-${VICARE_VERSION}
 }
 
 function install_ikarus {
