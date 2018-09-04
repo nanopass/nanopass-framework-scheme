@@ -750,3 +750,6 @@ LATEST
   * fixed assert-error so that it will work, now that there are tests that
     need to make use of it.
       tests/unit-test-helpers.ss
+2018-09-05 -
+  * remove outdated information and add links to papers
+      ReadMe.md
