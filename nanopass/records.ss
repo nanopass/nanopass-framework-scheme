@@ -461,7 +461,7 @@
                         (tspec-parent?-set! tspec #f #;(r t #'*nanopass-record-is-parent*))
                         (fxior tag tspec-tag-all))
                       tspec-tag-all)))))
-          (define annotate-alt*!
+          (define-who annotate-alt*!
             (lambda (bits)
               (lambda (alt-all-tag ntspec)
                 (let ([tag (ntspec-tag ntspec)] [nt-rtd (ntspec-rtd ntspec)] [ntname (ntspec-name ntspec)])
@@ -520,7 +520,8 @@
                                    (syntax-violation 'define-language "no terminal for meta-variable"
                                      lang-name (alt-syn a)))
                                  (terminal-alt-tspec-set! a tspec)
-                                 (f alt* next alt-all-tag))])))))))))
+                                 (f alt* next alt-all-tag))]
+                              [else (errorf who "unexpected terminal alt ~s" a)])))))))))
           (define annotate-ntspec*!
             (lambda (ntspec*)
               (let f ([nt-counter 0] [ntspec* ntspec*])
@@ -584,7 +585,8 @@
                               (let-values ([(pred term-pred new-tag) (annotate-all-pred! (nonterminal-alt-ntspec alt))])
                                 (f (cdr alt*) (cons pred pred*)
                                    (if term-pred (cons term-pred term-pred*) term-pred*)
-                                   (append new-tag tag)))]))))]))))
+                                   (append new-tag tag)))]
+                             [else (errorf who "unexpected alt ~s" alt)]))))]))))
           (let ([lang-rtd (make-record-type-descriptor (syntax->datum lang-name)
                             (record-type-descriptor nanopass-record)
                             (let ([nongen-id (language-nongenerative-id lang)])

@@ -63,6 +63,8 @@
     )
   (import
     (vicare)
+    (vicare language-extensions)
+    (vicare language-extensions tracing-syntaxes)
     (only (vicare expander) stx? stx-expr)
     (only (vicare compiler) optimize-level))
 
@@ -130,7 +132,7 @@
     (protocol
       (lambda (new)
         (lambda (a type)
-          (let ([sp (annotation-textual-position a)])
+          (let ([sp (reader-annotation-textual-position a)])
             (new
               (source-position-port-id sp) (source-position-byte sp)
               (source-position-character sp) #f #f (source-position-line sp)
@@ -142,7 +144,7 @@
         (cond
           [(stx? stx)
            (let ([e (stx-expr stx)])
-             (and (annotation? e) (make-source-information e type)))]
+             (and (reader-annotation? e) (make-source-information e type)))]
           [(pair? stx) (or (loop (car stx) 'near) (loop (cdr stx) 'near))]
           [else #f]))))
   

@@ -467,7 +467,8 @@
                                #,@out-field*
                                #,@(map (lambda (x) (format "~s" x)) (syntax->datum in-field-name*))))]
                         [(terminal-alt? in-altrec) (error who "unexpected terminal alt" in-altrec)]
-                        [(nonterminal-alt? in-altrec) (error who "unexpected nonterminal alt" in-altrec)])))
+                        [(nonterminal-alt? in-altrec) (error who "unexpected nonterminal alt" in-altrec)]
+                        [else (errorf who "unexpected alt: ~s" alt)])))
                   (cond
                     [(nonterminal-alt? alt)
                      (build-subtype-call (syntax->datum (ntspec-name (nonterminal-alt-ntspec alt))))]
