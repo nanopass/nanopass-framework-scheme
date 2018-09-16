@@ -750,3 +750,9 @@ LATEST
   * fixed assert-error so that it will work, now that there are tests that
     need to make use of it.
       tests/unit-test-helpers.ss
+2018-09-16
+  * fixed tests to work with recent version of vicare (0.4d1)
+      nanopass/implementation-helpers.vicare.sls, nanopass/language.ss,
+      nanopass/pass.ss, nanopass/records.ss, 
+      tests/implementation-helpers.vicare.sls, tests/test-driver.ss
+
