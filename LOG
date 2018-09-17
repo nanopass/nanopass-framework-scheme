@@ -753,3 +753,5 @@ LATEST
 2018-09-05 -
   * remove outdated information and add links to papers
       ReadMe.md
+  * fixed Travis CI fails caused by inaccurate vicare-scheme version
+     .travis/install_scheme
