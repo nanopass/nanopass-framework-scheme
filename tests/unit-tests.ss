@@ -1,10 +1,10 @@
-;;; Copyright (c) 2000-2015 Andrew W. Keep, R. Kent Dybvig
+;;; Copyright (c) 2000-2018 Andrew W. Keep, R. Kent Dybvig
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-tests)
   (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests
     run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests
-    run-argument-name-matching run-error-messages)
+    run-argument-name-matching run-error-messages run-pass-parser-unparser)
   (import (rnrs)
           (nanopass helpers)
           (nanopass language)
@@ -862,11 +862,11 @@
    (test-suite error-messages
      (test run-time-error-messages
        (assert-error
-         "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression (quote x) at character position 31678 of tests/unit-tests.ss"
+         (format "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression ~s at character position 31709 of tests/unit-tests.ss" ''x)
          (with-output-language (L-error Expr)
            `(lambda (,'x ...) z)))
        (assert-error
-         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at character position 32021 of tests/unit-tests.ss"
+         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at character position 32052 of tests/unit-tests.ss"
          (with-output-language (L-error Expr)
            `(let-values ([(,'x** ...) ,'(y)] ...) z)))
        ))
@@ -997,4 +997,104 @@
          "bar = \"I am bar\"\n"
          (with-output-to-string
            (lambda () (P12 'q))))))
+
+   (define (ski-combinator? x) (memq x '(S K I)))
+
+   (define-language Lski
+     (terminals
+       (ski-combinator (C)))
+     (Expr (e)
+       C
+       (e0 e1)))
+
+   (define-language Llc
+     (terminals
+       (symbol (x)))
+     (Expr (e)
+       x
+       (lambda (x) e)
+       (e0 e1)))
+
+   (define-pass ski->lc : Lski (ir) -> Llc ()
+     (definitions
+       (define-syntax with-variables
+         (syntax-rules ()
+           [(_ (x* ...) body0 body1 ...)
+            (let* ([x* (make-variable 'x*)] ...) body0 body1 ...)]))
+       (define counter 0)
+       (define inc-counter
+         (lambda ()
+           (let ([count counter])
+             (set! counter (fx+ count 1))
+             count)))
+       (define make-variable
+         (lambda (x)
+           (string->symbol
+             (format "~s.~s" x (inc-counter))))))
+     (Expr : Expr (e) -> Expr ()
+       [,C (case C
+             [(S) (with-variables (x y z)
+                    `(lambda (,x)
+                       (lambda (,y)
+                         (lambda (,z)
+                           ((,x ,z) (,y ,z))))))]
+             [(K) (with-variables (x y)
+                    `(lambda (,x)
+                       (lambda (,y)
+                         ,x)))]
+             [(I) (with-variables (x)
+                    `(lambda (,x) ,x))])]
+       [(,e0 ,e1)
+        (let* ([e0 (Expr e0)] [e1 (Expr e1)])
+          `(,e0 ,e1))]))
+
+   (define-pass ski-in : * (ir) -> Lski ()
+     (Expr : * (ir) -> Expr ()
+       (cond
+         [(memq ir '(S K I)) ir]
+         [(and (list? ir) (= (length ir) 2))
+          (let ([e0 (car ir)] [e1 (cdr ir)])
+            `(,(Expr e0) ,(Expr e1)))]
+         [else (errorf who "unrecognized ski input ~s" ir)]))
+     (Expr ir))
+
+   (define-pass lc-out : Llc (ir) -> * (sexpr)
+     (Expr : Expr (ir) -> * (sexpr)
+       [(lambda (,x) ,[sexpr]) `(lambda (,x) ,sexpr)]
+       [(,[sexpr0] ,[sexpr1]) `(,sexpr0 ,sexpr1)]
+       [,x x])
+     (Expr ir))
+
+   (test-suite pass-parser-unparser
+     (test pass-parsers
+       (assert-equal?
+         '((S K) I)
+         ((pass-input-parser ski-in) '((S K) I)))
+       (assert-equal?
+         (with-output-language (Lski Expr)
+           `((S K) I))
+         ((pass-input-parser ski->lc) '((S K) I)))
+       (assert-equal?
+         (with-output-language (Llc Expr)
+           `(lambda (x) (x x)))
+         ((pass-input-parser lc-out) '(lambda (x) (x x)))))
+     (test pass-unparsers
+       (assert-equal?
+         '((S I) K)
+         ((pass-output-unparser ski-in)
+          (with-output-language (Lski Expr)
+            `((S I) K))))
+       (assert-equal?
+         '((lambda (x) (x x)) (lambda (y) (y y)))
+         ((pass-output-unparser ski->lc)
+          (with-output-language (Llc Expr)
+            `((lambda (x) (x x)) (lambda (y) (y y))))))
+       (assert-equal?
+         'bob
+         ((pass-output-unparser lc-out) 'bob)))
+     (test pass-parser-unparser
+       (assert-equal?
+         '(((lambda (x.0) (lambda (y.1) x.0)) (lambda (x.2) x.2)) (lambda (x.3) x.3))
+         ((pass-output-unparser ski->lc) (ski->lc ((pass-input-parser ski->lc) '((K I) I)))))))
+
    )

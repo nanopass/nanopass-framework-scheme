@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2015 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
+;;; Copyright (c) 2000-2018 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for details
 
 ;;; TODO:
@@ -14,13 +14,42 @@
 ;;; 7. make cata work with Datum output
 
 (library (nanopass pass)
-  (export define-pass trace-define-pass echo-define-pass with-output-language nanopass-case)
+  (export define-pass trace-define-pass echo-define-pass with-output-language
+          nanopass-case pass-input-parser pass-output-unparser)
   (import (rnrs)
           (nanopass helpers)
           (nanopass records)
           (nanopass syntaxconvert)
           (nanopass meta-parser)
+          (nanopass parser)
+          (nanopass unparser)
           (rnrs mutable-pairs))
+
+  (define-syntax pass-input-parser
+    (lambda (x)
+      (syntax-case x ()
+        [(_ pass-name)
+         (with-compile-time-environment (rho)
+           (let ([Lid (rho #'pass-name #'pass-input-parser)])
+             (if Lid
+                 (with-syntax ([Lid Lid])
+                   #'(let ()
+                       (define-parser parse-Lid Lid)
+                       parse-Lid))
+                 #'(lambda (x . rest) x))))])))
+
+  (define-syntax pass-output-unparser
+    (lambda (x)
+      (syntax-case x ()
+        [(_ pass-name)
+         (with-compile-time-environment (rho)
+           (let ([Lid (rho #'pass-name #'pass-output-unparser)])
+             (if Lid
+                 (with-syntax ([Lid Lid])
+                   #'(let ()
+                       (define-unparser unparse-Lid Lid)
+                       unparse-Lid))
+                 #'(lambda (x . rest) x))))])))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
@@ -1495,13 +1524,16 @@
                              (syntax->datum maybe-otype) maybe-ometa-parser maybe-body)])
                 (echo-pass
                   (with-syntax ([who (datum->syntax pass-name 'who)])
-                    #`(define #,pass-name
-                        (lambda #,fml*
-                          (define who '#,pass-name)
-                          (define-nanopass-record)
-                          #,@defn*
-                          #,@(make-processors pass-desc pass-options maybe-imeta-parser maybe-ometa-parser)
-                          #,body)))))))))
+                    #`(begin
+                        (define #,pass-name
+                          (lambda #,fml*
+                            (define who '#,pass-name)
+                            (define-nanopass-record)
+                            #,@defn*
+                            #,@(make-processors pass-desc pass-options maybe-imeta-parser maybe-ometa-parser)
+                            #,body))
+                        #,@(if maybe-iname (list #`(define-property #,pass-name pass-input-parser #'#,maybe-iname)) (list))
+                        #,@(if maybe-oname (list #`(define-property #,pass-name pass-output-unparser #'#,maybe-oname)) (list))))))))))
 
       (syntax-case x ()
         [(_ pass-name ?colon iname (fml ...) ?arrow oname (xval ...) stuff ...)

@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2015 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
+;;; Copyright (c) 2000-2018 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for details
 
 (import (rnrs) (tests compiler-test) (tests helpers) (tests unit-tests) (nanopass helpers))
@@ -12,6 +12,7 @@
 (run-language-dot-support)
 (run-argument-name-matching)
 (run-error-messages)
+(run-pass-parser-unparser)
 (printf "Compiler loaded, running all tests (quietly)\n")
 (time
   (begin

@@ -760,3 +760,17 @@ LATEST
       nanopass/implementation-helpers.vicare.sls, nanopass/language.ss,
       nanopass/pass.ss, nanopass/records.ss, 
       tests/implementation-helpers.vicare.sls, tests/test-driver.ss
+2018-09-30 -
+  * implemented define-property for ikarus and vicare
+      nanopass/syntactic-property.sls (new),
+      nanopass/implementation-helpers.ikarus.ss,
+      nanopass/implementation-helpers.vicare.sls,
+      nanopass/implementation-helpers.chezscheme.ss, nanopass/helpers.ss
+  * added pass-input-parser and pass-output-unparser to allow the class
+    compiler driver to determine the parser and unparser for passes used in the
+    compiler so that we can trace and start at intermediate points in the
+    compiler without having to specify it in each case.
+      nanopass.ss, nanopass/pass.ss, test-all.ss, tests/unit-tests.ss,
+      tests/unit-test-helpers.ss
+  * updated to the most recent vicare release
+      .travis/install_scheme

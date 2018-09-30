@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2015 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
+;;; Copyright (c) 2000-2018 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for details
 
 (library (nanopass helpers)
@@ -38,7 +38,7 @@
     indirect-export
 
     ;; compile-time environment helpers
-    make-compile-time-value
+    define-property make-compile-time-value
 
     ;; code organization helpers
     module

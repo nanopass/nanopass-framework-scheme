@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2015 Andrew W. Keep, R. Kent Dybvig
+;;; Copyright (c) 2000-2018 Andrew W. Keep, R. Kent Dybvig
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-test-helpers)
@@ -56,11 +56,37 @@
          (write (quote name))
          (display " ...")
          (and assertion assertion* ...))]))
-  
+
+  ;; extended to cover record equality, but not doing the union-find
+  ;; equality we should be doing.
+  (define stupid-extended-equal?
+    (lambda (x y)
+      (or (equal? x y)
+          (and (record? x)
+               (record? y)
+               (record=? x y)))))
+
+  (define record-type-accessors
+    (lambda (rtd)
+      (let loop ([i (vector-length (record-type-field-names rtd))] [ls '()])
+        (if (fx=? i 0)
+            ls
+            (let ([i (fx- i 1)])
+              (loop i (cons (record-accessor rtd i) ls)))))))
+
+  (define record=?
+    (lambda (x y)
+      (let ([rtd (record-rtd x)])
+        (and (eq? rtd (record-rtd y))
+             (let loop ([rtd rtd])
+               (or (eq? rtd #f)
+                   (and (for-all (lambda (ac) (stupid-extended-equal? (ac x) (ac y))) (record-type-accessors rtd))
+                        (loop (record-type-parent rtd)))))))))
+
   (define-syntax assert-equal?
     (syntax-rules ()
       [(_ expected actual)
-       (or (equal? expected actual)
+       (or (stupid-extended-equal? expected actual)
            (begin
              (newline)
              (display "!!! ")
