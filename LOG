@@ -774,3 +774,15 @@ LATEST
       tests/unit-test-helpers.ss
   * updated to the most recent vicare release
       .travis/install_scheme
+2018-10-04 -
+  * Updated the way we store the pass input and output languages, so that we
+    can differentiate between a pass that does not have an input language or
+    output language and an identifier that is not for a pass.  These macros now
+    expand into code for the language unparser/parser (when there is an input
+    or output language), a procedure that takes one or more arguments and
+    returns the first one (when there is no input or output language), or #f
+    (when the identifier is not for a pass, or the pass info property has been
+    somehow lost).  Also added procedures for looking up the input and outpuot
+    language with an identifier and the compile time environment, and
+    determining if an identifier has related pass information.
+      nanopass.ss, nanopass/pass.ss nanopass/records.ss
