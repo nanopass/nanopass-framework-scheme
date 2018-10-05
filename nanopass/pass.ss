@@ -15,7 +15,8 @@
 
 (library (nanopass pass)
   (export define-pass trace-define-pass echo-define-pass with-output-language
-          nanopass-case pass-input-parser pass-output-unparser)
+          nanopass-case pass-input-parser pass-output-unparser
+          pass-identifier? pass-input-language pass-output-language)
   (import (rnrs)
           (nanopass helpers)
           (nanopass records)
@@ -30,26 +31,46 @@
       (syntax-case x ()
         [(_ pass-name)
          (with-compile-time-environment (rho)
-           (let ([Lid (rho #'pass-name #'pass-input-parser)])
-             (if Lid
-                 (with-syntax ([Lid Lid])
-                   #'(let ()
-                       (define-parser parse-Lid Lid)
-                       parse-Lid))
-                 #'(lambda (x . rest) x))))])))
+           (let ([pass-info (rho #'pass-name #'define-pass)])
+             (if pass-info
+                 (let ([Lid (pass-info-input-language pass-info)])
+                   (if Lid
+                       (with-syntax ([Lid Lid])
+                         #'(let ()
+                             (define-parser parse-Lid Lid)
+                             parse-Lid))
+                       #'(lambda (x . rest) x)))
+                 #'#f)))])))
 
   (define-syntax pass-output-unparser
     (lambda (x)
       (syntax-case x ()
         [(_ pass-name)
          (with-compile-time-environment (rho)
-           (let ([Lid (rho #'pass-name #'pass-output-unparser)])
-             (if Lid
-                 (with-syntax ([Lid Lid])
-                   #'(let ()
-                       (define-unparser unparse-Lid Lid)
-                       unparse-Lid))
-                 #'(lambda (x . rest) x))))])))
+           (let ([pass-info (rho #'pass-name #'define-pass)])
+             (if pass-info
+                 (let ([Lid (pass-info-output-language pass-info)])
+                   (if Lid
+                       (with-syntax ([Lid Lid])
+                         #'(let ()
+                             (define-unparser unparse-Lid Lid)
+                             unparse-Lid))
+                       #'(lambda (x . rest) x)))
+                 #f)))])))
+
+  (define pass-identifier?
+    (lambda (id rho)
+      (and (rho id #'define-pass) #t)))
+
+  (define pass-input-language
+    (lambda (id rho)
+      (let ([pass-info (rho id #'define-pass)])
+        (and pass-info (pass-info-input-language pass-info)))))
+
+  (define pass-output-language
+    (lambda (id rho)
+      (let ([pass-info (rho id #'define-pass)])
+        (and pass-info (pass-info-output-language pass-info)))))
 
   ;; NOTE: the following is less general then the with-output-language because it does not
   ;; support multiple return values.  It also generates nastier code for the expander to deal
@@ -1532,8 +1553,10 @@
                             #,@defn*
                             #,@(make-processors pass-desc pass-options maybe-imeta-parser maybe-ometa-parser)
                             #,body))
-                        #,@(if maybe-iname (list #`(define-property #,pass-name pass-input-parser #'#,maybe-iname)) (list))
-                        #,@(if maybe-oname (list #`(define-property #,pass-name pass-output-unparser #'#,maybe-oname)) (list))))))))))
+                        (define-property #,pass-name define-pass
+                          (make-pass-info
+                            #,(and maybe-iname #`#'#,maybe-iname)
+                            #,(and maybe-oname #`#'#,maybe-oname)))))))))))
 
       (syntax-case x ()
         [(_ pass-name ?colon iname (fml ...) ?arrow oname (xval ...) stuff ...)
