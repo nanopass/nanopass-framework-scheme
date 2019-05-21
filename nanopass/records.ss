@@ -168,7 +168,8 @@
                                       (syntax->datum (spec-name spec)) (syntax->datum lang-name))
                                     mv)))
                               (cdr specs))))
-                        (spec-meta-vars test-spec))))))))
+                        (spec-meta-vars test-spec)))
+                    (f (cdr specs)))))))
           (check-meta! name tspecs ntspecs)
           (new name entry-ntspec tspecs ntspecs #f #f #f nongen-id)))))
 
