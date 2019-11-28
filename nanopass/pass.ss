@@ -129,7 +129,7 @@
   (define-syntax nanopass-case
     ; (nanopass-case (lang type) id ---) rebinds id so that it always holds the
     ; current ir even through cata recursion
-    (lambda (x) 
+    (lambda (x)
       (syntax-case x (else)
         [(k (lang type) x cl ... [else b0 b1 ...])
          (identifier? #'x)
@@ -307,11 +307,11 @@
               result))
           (with-syntax ([lambda-expr (make-processor-lambda pass-desc pass-options maybe-imeta-parser maybe-ometa-parser pdesc)]
                         [name (pdesc-name pdesc)])
-            (echo-processor    
+            (echo-processor
               #`(define name
                   #,(if (pdesc-trace? pdesc)
                         (let ([maybe-ilang (pass-desc-maybe-ilang pass-desc)]
-                              [maybe-olang (pass-desc-maybe-olang pass-desc)])    
+                              [maybe-olang (pass-desc-maybe-olang pass-desc)])
                           (let ([iunparser (and maybe-ilang (pdesc-maybe-itype pdesc)
                                                 (let ([ilang (language-name maybe-ilang)])
                                                   (construct-id ilang "unparse-" ilang)))]
@@ -356,7 +356,7 @@
                                             (trace-let name ([fml fml] ...)
                                               (tproc fml ...)))))))))
                         #'lambda-expr))))))
-    
+
       (define make-processor-lambda
         (lambda (pass-desc pass-options maybe-imeta-parser maybe-ometa-parser pdesc)
           (let ([maybe-olang (pass-desc-maybe-olang pass-desc)]
@@ -627,7 +627,7 @@
                                  (if (and (identifier? #'expr) (eq? map-t #'expr))
                                      #`(id #,ls-t)
                                      #`(id (map (lambda (#,map-t)
-                                                  #,(if (null? tbinding*) 
+                                                  #,(if (null? tbinding*)
                                                         #'expr
                                                         #`(let* #,tbinding* expr)))
                                                 #,ls-t)))]))
@@ -756,7 +756,7 @@
                                ipred))
                            (append (gen-binding t acc) tbinding*)
                            ibinding* obinding*)))]
-                    [(nano-quote? elt) 
+                    [(nano-quote? elt)
                      (syntax-violation (syntax->datum (pass-desc-name pass-desc))
                        "quoted items are currently unsupported in patterns"
                        (nano-quote-x elt))]
@@ -812,7 +812,7 @@
                              (build-call callee-pdesc (cons t xfml*) maybe?)))
                          (define build-cata-call-3
                            (lambda (itype maybe-otype t outid*)
-                             (build-call 
+                             (build-call
                                (find-proc pass-desc pass-options (nano-cata-syntax elt) itype maybe-otype #t
                                  match-xfml* (length-matches (if maybe-otype (cdr outid*) outid*)))
                                (cons t xfml*) maybe?)))
@@ -940,7 +940,7 @@
                         (reverse rcond-cl*)
                         (let* ([alt (car alt*)] [alt (if (pair? alt) (car alt) alt)])
                           (f (cdr alt*)
-                             (cons 
+                             (cons
                                #`[(#,(cond
                                        [(pair-alt? alt) (pair-alt-pred alt)]
                                        [(terminal-alt? alt) (tspec-pred (terminal-alt-tspec alt))]
@@ -961,7 +961,7 @@
                                (let* ([tspec (terminal-alt-tspec alt)] [ttag (tspec-tag tspec)])
                                  (if ttag
                                      (f (cdr alt*) rcond-rec-cl*
-                                        (cons 
+                                        (cons
                                           (if (tspec-parent? tspec)
                                               #`[(not (fxzero? (fxand tag #,ttag))) body]
                                               #`[(eqv? tag #,ttag) body])
@@ -1212,7 +1212,7 @@
                             #,@user-clause*
                             #,@system-clause*
                             [else #,(if else-id
-                                        #`(#,else-id) 
+                                        #`(#,else-id)
                                         #`(error '#,(pass-desc-name pass-desc)
                                             #,(format "unexpected ~s" (syntax->datum itype))
                                             #,fml))])))
@@ -1231,13 +1231,13 @@
                         #`(cond
                             #,@user-rec-clause*
                             #,@system-rec-clause*
-                            [else 
+                            [else
                              (let ([tag (nanopass-record-tag #,fml)])
                                (cond
                                  #,@user-case-clause*
                                  #,@system-case-clause*
                                  [else #,(if else-id
-                                             #`(#,else-id) 
+                                             #`(#,else-id)
                                              #`(error '#,(pass-desc-name pass-desc)
                                                  #,(format "unexpected ~s" (syntax->datum itype))
                                                  #,fml))]))]))))))))))
@@ -1396,7 +1396,7 @@
                 (syntax-case x ()
                   [(?echo ?not-colon . rest)
                    (and (eq? (datum ?echo) 'echo) (not (eq? (datum ?not-colon) ':)))
-                   (loop #'(?not-colon . rest) trace? #t)]                  
+                   (loop #'(?not-colon . rest) trace? #t)]
                   [(?trace ?not-colon . rest)
                    (and (eq? (datum ?trace) 'trace) (not (eq? (datum ?not-colon) ':)))
                    (loop #'(?not-colon . rest) #t echo?)]
@@ -1587,7 +1587,7 @@
                    (if (null? stuff*)
                        (s2 defn* processor* #f pass-options)
                        (let ([stuff (car stuff*)])
-                         (if (let processor? ([stuff stuff] [mcount 0])                        
+                         (if (let processor? ([stuff stuff] [mcount 0])
                                (syntax-case stuff ()
                                  [(pname ?colon itype (fml ...) ?arrow otype (xval ...) . more)
                                   (and  (eq? (datum ?colon) ':)

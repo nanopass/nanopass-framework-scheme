@@ -78,8 +78,8 @@
     (lambda (x)
       (syntax-case x ()
         [(k . body)
-         (with-implicit (k quasiquote)
-           #'(let-syntax ([quasiquote (syntax-rules () [(_ x) `x])]) . body))])))
+         #`(let-syntax ([#,(datum->syntax #'k 'quasiquote) (syntax-rules () [(_ x) `x])])
+             . body)])))
 
   (define-syntax extended-quasiquote
     (lambda (x)

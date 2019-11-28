@@ -786,3 +786,10 @@ LATEST
     language with an identifier and the compile time environment, and
     determining if an identifier has related pass information.
       nanopass.ss, nanopass/pass.ss nanopass/records.ss
+2019-11-27 -
+  * Small fix to correct with-r6rs-quasiquote, which was previously not
+    restoring the normal R6RS quasiquote within a scope where a nanopass
+    quasiquote handler was bound.
+      nanopass/helpers.ss
+  * Whitespace cleanup.
+      nanopass/pass.ss
