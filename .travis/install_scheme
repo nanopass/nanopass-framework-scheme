@@ -22,8 +22,7 @@ function retrieve_file {
 
 function install_vicare {
   VICARE_BASE="https://bitbucket.org/marcomaggi/vicare-scheme/downloads"
-  VICARE_BASE_VERSION="0.4d0"
-  VICARE_VERSION="${VICARE_BASE_VERSION}pre4"
+  VICARE_VERSION="0.4.1-devel.3"
   VICARE_FILE="vicare-scheme-${VICARE_VERSION}.tar.xz"
   VICARE_URL="${VICARE_BASE}/${VICARE_FILE}"
 
@@ -36,12 +35,12 @@ function install_vicare {
 
   xzcat ${VICARE_FILE} | tar xf -
 
-  pushd "vicare-scheme-${VICARE_BASE_VERSION}"
+  pushd "vicare-scheme-${VICARE_VERSION}"
 
   ./configure --enable-posix --with-libffi
   make
   sudo make install
-  popd  # vicare-scheme-${VICARE_BASE_VERSION}
+  popd  # vicare-scheme-${VICARE_VERSION}
 }
 
 function install_ikarus {

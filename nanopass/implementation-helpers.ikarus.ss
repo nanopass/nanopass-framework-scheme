@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2015 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
+;;; Copyright (c) 2000-2018 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for details
 
 (library (nanopass implementation-helpers)
@@ -29,7 +29,7 @@
     indirect-export
 
     ;; compile-time environment helpers
-    #;define-property make-compile-time-value
+    define-property make-compile-time-value
 
     ;; code organization helpers
     module
@@ -64,7 +64,7 @@
     ; scheme-version<= with-scheme-version gensym? errorf with-output-to-string
     ; with-input-from-string
     )
-  (import (rnrs) (rnrs eval) (ikarus))
+  (import (rnrs) (rnrs eval) (ikarus) (nanopass syntactic-property))
 
   (define-syntax with-implicit
     (syntax-rules ()
@@ -172,6 +172,20 @@
     (syntax-rules ()
       [(_ id indirect-id ...) (define t (if #f #f))]))
 
+  (define-syntax define-property
+    (lambda (x)
+      (syntax-case x ()
+        [(_ id key value)
+         (with-syntax ([t (datum->syntax #'id (gensym (syntax->datum #'id)))])
+           (syntax-property-set! #'id #'key (syntax->datum #'t))
+           #'(define-syntax waste (let () (set-symbol-value! 't value) (lambda (x) (syntax-violation #f "invalid syntax" x)))))])))
+
   (define-syntax with-compile-time-environment
     (syntax-rules ()
-      [(_ (arg) body* ... body) (lambda (arg) body* ... body)])))
+      [(k (arg) body* ... body)
+       (lambda (rho)
+         (let ([arg (case-lambda
+                      [(x) (rho x)]
+                      [(x y) (let ([sym (syntax-property-get x y #f)])
+                               (and sym (symbol-value sym)))])])
+           body* ... body))])))

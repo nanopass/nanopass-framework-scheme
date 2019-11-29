@@ -1,8 +1,10 @@
-;;; Copyright (c) 2000-2015 Andrew W. Keep, R. Kent Dybvig
+;;; Copyright (c) 2000-2018 Andrew W. Keep, R. Kent Dybvig
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-tests)
-  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests)
+  (export run-unit-tests run-ensure-correct-identifiers run-maybe-tests
+    run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests
+    run-argument-name-matching run-error-messages run-pass-parser-unparser)
   (import (rnrs)
           (nanopass helpers)
           (nanopass language)
@@ -847,9 +849,252 @@
      (CaseLambdaClause (cl)
        (clause (x ...) e)))
 
+   (define-language L-error
+     (terminals
+       (symbol (x)))
+     (Expr (e body)
+       x
+       (lambda (x* ...) body* ... body)
+       (let ([x* e*] ...) body* ... body)
+       (let-values ([(x** ...) e*] ...) body* ... body)
+       (e e* ...)))
 
-   #;(test-suite error-messages
-     (
-               ))
+   (test-suite error-messages
+     (test run-time-error-messages
+       (assert-error
+         (format "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression ~s at character position 31709 of tests/unit-tests.ss" ''x)
+         (with-output-language (L-error Expr)
+           `(lambda (,'x ...) z)))
+       (assert-error
+         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at character position 32052 of tests/unit-tests.ss"
+         (with-output-language (L-error Expr)
+           `(let-values ([(,'x** ...) ,'(y)] ...) z)))
+       ))
+
+   ;; regression test for error reported by R. Kent Dybvig:
+
+   (define-language L
+     (terminals
+       (symbol (x)))
+     (A (a) b)
+     (B (b) x))
+
+   (define-pass P1 : L (ir) -> L ()
+     (A : A (ir foo bar ignore) -> A ())
+     (B : B (ir foo bar) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (A ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P2 : L (ir) -> L ()
+     (A : A (ir foo bar ignore) -> A ())
+     (B : B (ir bar) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (A ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P3 : L (ir) -> L ()
+     (A : A (ir xxfoo xxbar ignore) -> A ())
+     (B : B (ir foo bar) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (B2 : B (ir) -> B ()
+       [else (printf "calling B2\n") ir])
+     (A ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P4 : L (ir) -> L ()
+     (A : A (ir) -> A ())
+     (B : B (ir [foo "I am not bar"] [bar "I am bar"]) -> B ()
+       [else (printf "bar = ~s\n" bar) ir])
+     (A ir))
+
+   (define-pass P5 : L (ir) -> L ()
+     (B : B (ir foo bar ignore) -> B ())
+     (symbol : symbol (ir foo bar) -> symbol ()
+       (printf "bar = ~s\n" bar)
+       ir)
+     (B ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P6 : L (ir) -> L ()
+     (B : B (ir foo bar ignore) -> B ())
+     (symbol : symbol (ir bar) -> symbol ()
+       (printf "bar = ~s\n" bar)
+       ir)
+     (B ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P7 : L (ir) -> L ()
+     (B : B (ir foo bar ignore) -> B ())
+     (symbol : symbol (ir xxfoo xxbar) -> symbol ()
+       (printf "bar = ~s\n" xxbar)
+       ir)
+     (symbol2 : symbol (ir) -> symbol ()
+       (printf "calling symbol2\n")
+       ir)
+     (B ir "I am not bar" "I am bar" "extra stuff"))
+
+   (define-pass P8 : L (ir) -> L ()
+     (B : B (ir) -> B ())
+     (symbol : symbol (ir [foo "I am not bar"] [bar "I am bar"]) -> symbol ()
+       (printf "bar = ~s\n" bar)
+       ir)
+     (B ir))
+
+   (define-pass P9 : L (ir foo bar ignore) -> L ()
+     (A : A (ir foo bar) -> A ()
+       [else (printf "bar = ~s\n" bar) ir]))
+
+   (define-pass P10 : L (ir foo bar ignore) -> L ()
+     (A : A (ir bar) -> A ()
+       [else (printf "bar = ~s\n" bar) ir]))
+
+   (define-pass P11 : L (ir foo bar ignore) -> L ()
+     (A : A (ir xxfoo xxbar) -> A ())
+     (A2 : A (ir) -> A ()
+       [else (printf "calling A2\n") ir]))
+
+   (define-pass P12 : L (ir) -> L ()
+     (A : A (ir [foo "I am not bar"] [bar "I am bar"]) -> A ()
+       [else (printf "bar = ~s\n" bar) ir]))
+
+   (test-suite argument-name-matching
+     (test sub-nonterminal-regression
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P1 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P2 'q))))
+       (assert-equal?
+         "calling B2\n"
+         (with-output-to-string (lambda () (P3 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P4 'q)))))
+     (test sub-terminal-regression
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P5 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P6 'q))))
+       (assert-equal?
+         "calling symbol2\n"
+         (with-output-to-string (lambda () (P7 'q))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string (lambda () (P8 'q)))))
+     (test sub-terminal-regression
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string
+           (lambda () (P9 'q "I am not bar" "I am bar" "extra stuff"))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string
+           (lambda () (P10 'q "I am not bar" "I am bar" "extra stuff"))))
+       (assert-equal?
+         "calling A2\n"
+         (with-output-to-string
+           (lambda () (P11 'q "I am not bar" "I am bar" "extra stuff"))))
+       (assert-equal?
+         "bar = \"I am bar\"\n"
+         (with-output-to-string
+           (lambda () (P12 'q))))))
+
+   (define (ski-combinator? x) (memq x '(S K I)))
+
+   (define-language Lski
+     (terminals
+       (ski-combinator (C)))
+     (Expr (e)
+       C
+       (e0 e1)))
+
+   (define-language Llc
+     (terminals
+       (symbol (x)))
+     (Expr (e)
+       x
+       (lambda (x) e)
+       (e0 e1)))
+
+   (define-pass ski->lc : Lski (ir) -> Llc ()
+     (definitions
+       (define-syntax with-variables
+         (syntax-rules ()
+           [(_ (x* ...) body0 body1 ...)
+            (let* ([x* (make-variable 'x*)] ...) body0 body1 ...)]))
+       (define counter 0)
+       (define inc-counter
+         (lambda ()
+           (let ([count counter])
+             (set! counter (fx+ count 1))
+             count)))
+       (define make-variable
+         (lambda (x)
+           (string->symbol
+             (format "~s.~s" x (inc-counter))))))
+     (Expr : Expr (e) -> Expr ()
+       [,C (case C
+             [(S) (with-variables (x y z)
+                    `(lambda (,x)
+                       (lambda (,y)
+                         (lambda (,z)
+                           ((,x ,z) (,y ,z))))))]
+             [(K) (with-variables (x y)
+                    `(lambda (,x)
+                       (lambda (,y)
+                         ,x)))]
+             [(I) (with-variables (x)
+                    `(lambda (,x) ,x))])]
+       [(,e0 ,e1)
+        (let* ([e0 (Expr e0)] [e1 (Expr e1)])
+          `(,e0 ,e1))]))
+
+   (define-pass ski-in : * (ir) -> Lski ()
+     (Expr : * (ir) -> Expr ()
+       (cond
+         [(memq ir '(S K I)) ir]
+         [(and (list? ir) (= (length ir) 2))
+          (let ([e0 (car ir)] [e1 (cdr ir)])
+            `(,(Expr e0) ,(Expr e1)))]
+         [else (errorf who "unrecognized ski input ~s" ir)]))
+     (Expr ir))
+
+   (define-pass lc-out : Llc (ir) -> * (sexpr)
+     (Expr : Expr (ir) -> * (sexpr)
+       [(lambda (,x) ,[sexpr]) `(lambda (,x) ,sexpr)]
+       [(,[sexpr0] ,[sexpr1]) `(,sexpr0 ,sexpr1)]
+       [,x x])
+     (Expr ir))
+
+   (test-suite pass-parser-unparser
+     (test pass-parsers
+       (assert-equal?
+         '((S K) I)
+         ((pass-input-parser ski-in) '((S K) I)))
+       (assert-equal?
+         (with-output-language (Lski Expr)
+           `((S K) I))
+         ((pass-input-parser ski->lc) '((S K) I)))
+       (assert-equal?
+         (with-output-language (Llc Expr)
+           `(lambda (x) (x x)))
+         ((pass-input-parser lc-out) '(lambda (x) (x x)))))
+     (test pass-unparsers
+       (assert-equal?
+         '((S I) K)
+         ((pass-output-unparser ski-in)
+          (with-output-language (Lski Expr)
+            `((S I) K))))
+       (assert-equal?
+         '((lambda (x) (x x)) (lambda (y) (y y)))
+         ((pass-output-unparser ski->lc)
+          (with-output-language (Llc Expr)
+            `((lambda (x) (x x)) (lambda (y) (y y))))))
+       (assert-equal?
+         'bob
+         ((pass-output-unparser lc-out) 'bob)))
+     (test pass-parser-unparser
+       (assert-equal?
+         '(((lambda (x.0) (lambda (y.1) x.0)) (lambda (x.2) x.2)) (lambda (x.3) x.3))
+         ((pass-output-unparser ski->lc) (ski->lc ((pass-input-parser ski->lc) '((K I) I)))))))
 
    )

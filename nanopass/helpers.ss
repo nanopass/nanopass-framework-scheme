@@ -1,4 +1,4 @@
-;;; Copyright (c) 2000-2015 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
+;;; Copyright (c) 2000-2018 Dipanwita Sarkar, Andrew W. Keep, R. Kent Dybvig, Oscar Waddell
 ;;; See the accompanying file Copyright for details
 
 (library (nanopass helpers)
@@ -38,7 +38,7 @@
     indirect-export
 
     ;; compile-time environment helpers
-    make-compile-time-value
+    define-property make-compile-time-value
 
     ;; code organization helpers
     module
@@ -78,8 +78,8 @@
     (lambda (x)
       (syntax-case x ()
         [(k . body)
-         (with-implicit (k quasiquote)
-           #'(let-syntax ([quasiquote (syntax-rules () [(_ x) `x])]) . body))])))
+         #`(let-syntax ([#,(datum->syntax #'k 'quasiquote) (syntax-rules () [(_ x) `x])])
+             . body)])))
 
   (define-syntax extended-quasiquote
     (lambda (x)
@@ -89,10 +89,14 @@
             (syntax-case body (unquote unquote-splicing)
               [(unquote x)
                (identifier? #'x)
-               (values body (cons #'x t*) (cons #'x e*))]
+               (if (memp (lambda (t) (bound-identifier=? t #'x)) t*)
+                   (values body t* e*)
+                   (values body (cons #'x t*) (cons #'x e*)))]
               [(unquote-splicing x)
                (identifier? #'x)
-               (values body (cons #'x t*) (cons #'x e*))]
+               (if (memp (lambda (t) (bound-identifier=? t #'x)) t*)
+                   (values body t* e*)
+                   (values body (cons #'x t*) (cons #'x e*)))]
               [(unquote e)
                (with-syntax ([(t) (generate-temporaries '(t))])
                  (values #'(unquote t) (cons #'t t*) (cons #'e e*)))]
