@@ -2,7 +2,7 @@
 ;;; See the accompanying file Copyright for details
 
 (library (nanopass records)
-  (export find-spec nonterminal-meta? nano-alt->ntspec
+  (export find-spec nonterminal-meta?
           nonterm-id->ntspec? nonterm-id->ntspec id->spec term-id->tspec?
 
           meta-name->tspec meta-name->ntspec
@@ -315,12 +315,6 @@
                          (tspec-pred tspec)))
               (language-tspecs lang))
             (syntax-violation #f "meta not found" (language-name lang) m)))))
-
-  ;;; TODO, figure out if this can ever be called, if not remove the
-  ;;;       reference to it, if so, figure out what should be implemented.
-  (define nano-alt->ntspec
-    (lambda (alt ntspecs)
-      (error 'nano-alt->ntspec "Not implemented")))
 
   (define id->spec
     (lambda (id lang)

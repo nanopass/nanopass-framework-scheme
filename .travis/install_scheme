@@ -67,31 +67,18 @@ function install_ikarus {
 }
 
 function install_chez {
-  BASE_URL="http://scheme.com/download"
-  CHEZ_VERSION="8.4"
+  BASE_URL="https://github.com/cisco/ChezScheme/releases"
+  CHEZ_VERSION="9.5.2"
+  CHEZ_FILE="csv${CHEZ_VERSION}.tar.gz"
 
-  case $ARCH in
-    i386|i686) CHEZ_ARCH="i3" ;;
-    x86_64|amd64) CHEZ_ARCH="a6" ;;
-    *) echo "unexpected architecture $ARCH" ; exit 1 ;;
-  esac
-
-  case $OS in
-    Linux) CHEZ_OS="le" ; PREFIX="/usr" ;;
-    Darwin) CHEZ_OS="osx" ; PREFIX="/usr/local" ;;
-    *) echo "unexpected operating system $OS" ; exit 1 ;;
-  esac
-
-  CHEZ_FILE="pcsv${CHEZ_VERSION}-${CHEZ_ARCH}${CHEZ_OS}.tar.gz"
-
-  retrieve_file "${BASE_URL}/${CHEZ_FILE}" ${CHEZ_FILE}
+  retrieve_file "${BASE_URL}/download/v${CHEZ_VERSION}/${CHEZ_FILE}" ${CHEZ_FILE}
   
   tar zxf $CHEZ_FILE
-  pushd "csv${CHEZ_VERSION}/custom"
-  ./configure --installprefix=$PREFIX --installman=$PREFIX/man
+  pushd "csv${CHEZ_VERSION}"
+  ./configure
   make
   sudo make install
-  popd  # "csv${CHEZ_VERSION}/custom"
+  popd  # "csv${CHEZ_VERSION}"
 }
 
 case $SCHEME in
