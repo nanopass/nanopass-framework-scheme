@@ -150,7 +150,7 @@
          (finish #'(pat ...) #'((e1 e2 ...) ...) #'())])))
 
   (define provide-full-source-information
-    (make-parameter #f (lambda (n) (and n #t))))
+    (make-parameter #t (lambda (n) (and n #t))))
 
   (define-record-type source-information
     (nongenerative)

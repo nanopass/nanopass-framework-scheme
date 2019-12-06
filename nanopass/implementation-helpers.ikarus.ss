@@ -120,7 +120,7 @@
          (with-input-from-string (format "#{~a~a ~a~a}" pretty-name extra0 unique-name extra1) read))]))
 
   (define provide-full-source-information
-    (make-parameter #f (lambda (x) (and x #t))))
+    (make-parameter #t (lambda (x) (and x #t))))
 
   (define-record-type source-information
     (nongenerative)

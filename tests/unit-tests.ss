@@ -862,11 +862,11 @@
    (test-suite error-messages
      (test run-time-error-messages
        (assert-error
-         (format "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression ~s at character position 31709 of tests/unit-tests.ss" ''x)
+         (format "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression ~s at line 867, char 23 of tests/unit-tests.ss" ''x)
          (with-output-language (L-error Expr)
            `(lambda (,'x ...) z)))
        (assert-error
-         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at character position 32052 of tests/unit-tests.ss"
+         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at line 871, char 29 of tests/unit-tests.ss"
          (with-output-language (L-error Expr)
            `(let-values ([(,'x** ...) ,'(y)] ...) z)))
        ))
