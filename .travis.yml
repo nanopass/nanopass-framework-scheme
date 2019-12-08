@@ -10,9 +10,9 @@ matrix:
     - os: osx
       env: SCHEME=ikarus
       before_script:
-        brew update
-        brew install libffi
-        brew install bzr
+        - brew update
+        - brew install libffi
+        - brew install bzr
     - os: linux
       env: SCHEME=chez
       addons:
