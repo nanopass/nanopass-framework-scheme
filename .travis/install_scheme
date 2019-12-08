@@ -72,10 +72,23 @@ function install_chez {
   CHEZ_FILE="csv${CHEZ_VERSION}.tar.gz"
 
   retrieve_file "${BASE_URL}/download/v${CHEZ_VERSION}/${CHEZ_FILE}" ${CHEZ_FILE}
+
+  case $ARCH in
+    i386|i686) ARCH_MT="i3" ;;
+    x86_64|amd64) ARCH_MT="a6" ;;
+    *) echo "unexpected architecture $ARCH" ; exit 1 ;;
+  esac
+
+  case $OS in
+    Linux) OS_MT="le" ;;
+    Darwin) OS_MT="osx" ;;
+    Windows) OS_MT="nt" ;;
+    *) echo "unexpected operating system $OS" ; exit 1 ;;
+  esac
   
   tar zxf $CHEZ_FILE
   pushd "csv${CHEZ_VERSION}"
-  ./configure
+  ./configure -m="${ARCH_MT}${OS_MT}"
   make
   sudo make install
   popd  # "csv${CHEZ_VERSION}"

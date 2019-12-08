@@ -24,9 +24,9 @@
                ""))
          op)]))
 
-  ;; needed to get an r6rs script to print with vicare
-  (current-output-port (current-error-port))
-
   (define-syntax format-error-message
     (syntax-rules ()
-      [(_ args ...) (format args ...)])))
+      [(_ args ...) (format args ...)]))
+
+  ;; needed to get an r6rs script to print with vicare
+  (current-output-port (current-error-port)))
