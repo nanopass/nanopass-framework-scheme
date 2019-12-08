@@ -99,7 +99,7 @@ function install_chez {
       ;;
     nt)
       retrieve_file "${BASE_URL}/download/v${CHEZ_VERSION}/${CHEZ_EXE}" ${CHEZ_EXE}
-      ${CHEZ_EXE} /quiet /install
+      ./${CHEZ_EXE} /quiet /install
       export PATH=/c/Program\ Files/Chez\ Scheme\ ${CHEZ_VERSION}/bin/${MT}:$PATH
       echo "(scheme-version)" | scheme -q
       ;;
