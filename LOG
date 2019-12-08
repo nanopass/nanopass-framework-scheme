@@ -793,3 +793,19 @@ LATEST
       nanopass/helpers.ss
   * Whitespace cleanup.
       nanopass/pass.ss
+2019-12-07 -
+  * Small fix to make the unit tests exit with a non-zero exit code when one of
+    the unit test fails.  Along with this fixed formatting around the error
+    messages so that it should be consistent across platforms.  This required a
+    bit of hackery to get the filename that will be used by Chez, Ikarus, and
+    Vicare, along with exposing a version of format that sets the print
+    parameters necessary to get it to match display-condition (in Chez, this is
+    just format in Ikarus and Vicare).  Finally, exposed some of the underlying
+    source information extracting functions.
+      test-all.ss, nanopass/helpers.ss,
+      tests/unit-test-helpers-implementation.chezscheme.sls,
+      tests/unit-test-helpers-implementation.ikarus.sls,
+      tests/unit-test-helpers-implementation.vicare.sls,
+      tests/unit-test-helpers.ss, tests/unit-tests.ss
+  * Corrected (embarrassing) misspelling of received.
+      nanopass/records.ss

@@ -253,19 +253,19 @@
         (assert-equal? #f (parse-LBoolLambda #f)))
       (let ()
         (define-parser parse-LBoolLambda LBoolLambda)
-        (assert-equal? 
-          '(lambda (x) #f) 
+        (assert-equal?
+          '(lambda (x) #f)
           (unparse-LBoolLambda
             (parse-LBoolLambda '(lambda (x) #f)))))
       (let ()
         (define-parser parse-LBoolLambda LBoolLambda)
-        (assert-equal? 
-          '(lambda (f) (f #f)) 
+        (assert-equal?
+          '(lambda (f) (f #f))
           (unparse-LBoolLambda
             (parse-LBoolLambda '(lambda (f) (f #f))))))
       (let ()
         (define-parser parse-LBoolLambda LBoolLambda)
-        (assert-equal? 
+        (assert-equal?
           '(lambda (f) (not (f #f)))
           (unparse-LBoolLambda
             (parse-LBoolLambda '(lambda (f) (not (f #f)))))))))
@@ -570,7 +570,7 @@
        (bar (maybe e) ... x)
        (num n)
        (ref x)))
-   
+
    (test-suite maybe-unparse-tests
      (test maybe-unparse
        (assert-equal? '(foo x 10)
@@ -859,14 +859,19 @@
        (let-values ([(x** ...) e*] ...) body* ... body)
        (e e* ...)))
 
+   (define test-file
+     (let ()
+       (define-syntax foo (lambda (x) (syntax-violation 'foo "unexpected call to foo" x)))
+       (source-information-source-file (syntax->source-information #'foo))))
+
    (test-suite error-messages
      (test run-time-error-messages
        (assert-error
-         (format "Exception in with-output-language: expected list of symbol but recieved x in field x* of (lambda (x* ...) body* ... body) from expression ~s at line 867, char 23 of tests/unit-tests.ss" ''x)
+         (format-error-message "Exception in with-output-language: expected list of symbol but received x in field x* of (lambda (x* ...) body* ... body) from expression ~s at line 872, char 23 of ~a" ''x test-file)
          (with-output-language (L-error Expr)
            `(lambda (,'x ...) z)))
        (assert-error
-         "Exception in with-output-language: expected list of list of symbol but recieved x** in field x** of (let-values (((...) e*) ...) body* ... body) from expression (quote x**) at line 871, char 29 of tests/unit-tests.ss"
+         (format-error-message "Exception in with-output-language: expected list of list of symbol but received x** in field x** of ~s from expression ~s at line 876, char 29 of ~a" '(let-values (((x** ...) e*) ...) body* ... body) ''x** test-file)
          (with-output-language (L-error Expr)
            `(let-values ([(,'x** ...) ,'(y)] ...) z)))
        ))

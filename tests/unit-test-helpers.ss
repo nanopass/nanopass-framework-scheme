@@ -2,9 +2,9 @@
 ;;; See the accompanying file Copyright for details
 
 (library (tests unit-test-helpers)
-  (export test-suite test assert-equal? assert-error with-output-to-string)
+  (export test-suite test assert-equal? assert-error with-output-to-string format-error-message)
   (import (rnrs) (tests unit-test-helpers-implementation) (only (nanopass helpers) errorf))
-  
+
   (define-syntax test-suite
     (lambda (x)
       (define name->run-name
@@ -32,8 +32,9 @@
                          (write failures)
                          (display " failures, and ")
                          (write exceptions)
-                         (display " exceptions\n"))
-                       (guard (e [else 
+                         (display " exceptions\n")
+                         (and (= failures 0) (= exceptions 0)))
+                       (guard (e [else
                                    (display "    caught expection... ")
                                    (display-condition e)
                                    (newline)
@@ -43,11 +44,11 @@
                                 (write result)
                                 (newline)
                                 (if result
-                                    (f (cdr tests) (+ successes 1) failures 
+                                    (f (cdr tests) (+ successes 1) failures
                                        exceptions)
                                     (f (cdr tests) successes (+ failures 1)
                                        exceptions)))))))))])))
-  
+
   (define-syntax test
     (syntax-rules ()
       [(_ name assertion assertion* ...)
@@ -91,7 +92,7 @@
              (newline)
              (display "!!! ")
              (write actual)
-             (display " does not match expected: ") 
+             (display " does not match expected: ")
              (write expected)
              (newline)
              #f))]))

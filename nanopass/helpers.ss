@@ -67,7 +67,19 @@
 
     ;; abstraction of the grabbing the syntactic environment that will work in
     ;; Chez, Ikarus, & Vicare
-    with-compile-time-environment)
+    with-compile-time-environment
+
+    ;; expose the source information stuff
+    syntax->source-information
+    source-information-source-file
+    source-information-byte-offset-start
+    source-information-char-offset-start
+    source-information-byte-offset-end
+    source-information-char-offset-end
+    source-information-position-line
+    source-information-position-column
+    source-information-type
+    provide-full-source-information)
   (import (rnrs) (nanopass implementation-helpers))
 
   (define-syntax datum

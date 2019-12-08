@@ -662,10 +662,10 @@
                                           (let ([msg #,msg])
                                             (if msg
                                                 (errorf who
-                                                  "expected ~a but recieved ~s in field ~s of ~s from ~a"
+                                                  "expected ~a but received ~s in field ~s of ~s from ~a"
                                                   #,(build-list-of-string level name) x '#,fld '#,(alt-syn alt) msg)
                                                 (errorf who
-                                                  "expected ~a but recieved ~s in field ~s of ~s"
+                                                  "expected ~a but received ~s in field ~s of ~s"
                                                   #,(build-list-of-string level name) x '#,fld '#,(alt-syn alt))))])))))
                           #,fld))))))
             (with-syntax ([(fld ...) (pair-alt-field-names alt)])
