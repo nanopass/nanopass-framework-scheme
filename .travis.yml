@@ -38,7 +38,7 @@ matrix:
             - libgmp-dev
             - libffi-dev
     - os: windows
-      env: SCHEME=chez
+      env: SCHEME=chez OS=Windows_NT
       before_script:
         - rm .git/index; git reset --hard
         - choco install make -y

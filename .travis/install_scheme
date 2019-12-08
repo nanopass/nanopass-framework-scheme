@@ -82,7 +82,7 @@ function install_chez {
   case $OS in
     Linux) OS_MT="le" ;;
     Darwin) OS_MT="osx" ;;
-    Windows|MSYS_NT*) OS_MT="nt" ;;
+    Windows*|MSYS_NT*) OS_MT="nt" ;;
     *) echo "unexpected operating system $OS" ; exit 1 ;;
   esac
 
