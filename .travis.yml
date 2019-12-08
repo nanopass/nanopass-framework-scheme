@@ -42,6 +42,7 @@ matrix:
       before_script:
         - rm .git/index; git reset --hard
         - choco install make -y
+        - choco install sudo -y
 dist: bionic
 script:
   - .travis/install_scheme
