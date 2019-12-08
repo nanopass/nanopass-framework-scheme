@@ -69,9 +69,8 @@ function install_ikarus {
 function install_chez {
   BASE_URL="https://github.com/cisco/ChezScheme/releases"
   CHEZ_VERSION="9.5.2"
-  CHEZ_FILE="csv${CHEZ_VERSION}.tar.gz"
-
-  retrieve_file "${BASE_URL}/download/v${CHEZ_VERSION}/${CHEZ_FILE}" ${CHEZ_FILE}
+  CHEZ_TGZ="csv${CHEZ_VERSION}.tar.gz"
+  CHEZ_EXE="ChezScheme${CHEZ_VERSION}.exe"
 
   case $ARCH in
     i386|i686) ARCH_MT="i3" ;;
@@ -86,12 +85,26 @@ function install_chez {
     *) echo "unexpected operating system $OS" ; exit 1 ;;
   esac
 
-  tar zxf $CHEZ_FILE
-  pushd "csv${CHEZ_VERSION}"
-  ./configure -m="${ARCH_MT}${OS_MT}"
-  make
-  sudo make install
-  popd  # "csv${CHEZ_VERSION}"
+  MT="${ARCH_MT}${OS_MT}"
+
+  case $OS_MT in
+    le|osx)
+      retrieve_file "${BASE_URL}/download/v${CHEZ_VERSION}/${CHEZ_TGZ}" ${CHEZ_TGZ}
+      tar zxf $CHEZ_TGZ
+      pushd "csv${CHEZ_VERSION}"
+      ./configure -m="${ARCH_MT}${OS_MT}"
+      make
+      sudo make install
+      popd  # "csv${CHEZ_VERSION}"
+      ;;
+    nt)
+      retrieve_file "${BASE_URL}/download/v${CHEZ_VERSION}/${CHEZ_EXE}" ${CHEZ_EXE}
+      ${CHEZ_EXE} /quiet /install
+      export PATH=/c/Program\ Files/Chez\ Scheme\ ${CHEZ_VERSION}/bin/${MT}:$PATH
+      echo "(scheme-version)" | scheme -q
+      ;;
+    *) echo "unrecognized OS_MT: ${OS_MT}" ; exit 1 ;;
+  esac
 }
 
 case $SCHEME in
