@@ -37,12 +37,12 @@ matrix:
             - libncurses5-dev
             - libgmp-dev
             - libffi-dev
-    - os: windows
-      env: SCHEME=chez OS=Windows_NT
-      before_script:
-        - rm .git/index; git reset --hard
-        - choco install make -y
-        - choco install sudo -y
+#    - os: windows
+#      env: SCHEME=chez
+#      before_script:
+#        - rm .git/index; git reset --hard
+#        - choco install make -y
+#        - choco install sudo -y
 dist: bionic
 script:
   - .travis/install_scheme
