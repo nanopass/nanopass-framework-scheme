@@ -17,7 +17,7 @@
     meta-var->raw-meta-var combine unique-name
 
     ;; convenience syntactic forms
-    rec with-values define-who 
+    rec with-values define-who trace-define-who
 
     ;; source information funtions
     syntax->source-info 
@@ -262,6 +262,15 @@
            #'(define name (let () (define who 'name) expr)))]
         [(k (name . fmls) expr exprs ...)
          #'(define-who name (lambda (fmls) expr exprs ...))])))
+
+  (define-syntax trace-define-who
+    (lambda (x)
+      (syntax-case x ()
+        [(k name expr)
+         (with-implicit (k who)
+           #'(trace-define name (let () (define who 'name) expr)))]
+        [(k (name . fmls) expr exprs ...)
+         #'(trace-define-who name (lambda (fmls) expr exprs ...))])))
 
   ;;; moved from meta-syntax-dispatch.ss and nano-syntax-dispatch.ss
   (define combine

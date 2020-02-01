@@ -427,7 +427,7 @@
                                      fml*))]
                               [(nano-meta? nrec) (f (nano-meta-fields nrec) fml*)]
                               [(list? nrec) (f nrec fml*)]
-                              [(nano-quote? nrec) (syntax-violation who "quoted terminals currently unsupported in match patterns" (nano-quote-x nrec) cl)]
+                              [(nano-quote? nrec) (syntax-violation who (format "quoted terminals (~s) currently unsupported in match patterns" (nano-quote-x nrec)) (nano-quote-x nrec) cl)]
                               [else (error who "unrecognized nano-rec" nrec)])))
                         fml* nrec*))))
                 (define (helper cl lhs guard rhs rhs*)
@@ -469,7 +469,7 @@
                                     #'(proc arg)
                                     (loop #'(lambda (x) (map proc x)) (fx- level 1)))))))))
                   (define-who process-alt
-                    (lambda (in-altsyn in-altrec out-altrec)
+                    (lambda (in-altrec out-altrec)
                       (define process-alt-field
                         (lambda (level maybe? fname aname ofname)
                           (let ([callee-pdesc
@@ -532,22 +532,21 @@
                          [(null? xval*) fml]
                          [else #`(values #,fml #,@xval*)]))]
                     [else
-                     (let ([alt-syntax (alt-syn alt)])
-                       (let ([oalt (exists-alt? alt (nonterm-id->ntspec who maybe-otype maybe-ontspec*))])
-                         (if oalt
-                             (let ([alt-code (process-alt alt-syntax alt oalt)]
-                                    [xval* (pdesc-xval* pdesc)])
-                               (if (null? xval*)
-                                   alt-code
-                                   #`(values #,alt-code #,@xval*)))
-                             ; TODO: if there were no user provided clauses for this input alt,
-                             ; we could raise a compile time error here, otherwise we have to rely
-                             ; on the runtime error
-                             #`(error '#,(pass-desc-name pass-desc)
-                                 (format "no matching clause for input ~s in processor ~s"
-                                   '#,alt-syntax
-                                   '#,(pdesc-name pdesc))
-                                 #,fml))))])))
+                     (let ([oalt (exists-alt? alt (nonterm-id->ntspec who maybe-otype maybe-ontspec*))])
+                       (if oalt
+                           (let ([alt-code (process-alt alt oalt)]
+                                 [xval* (pdesc-xval* pdesc)])
+                             (if (null? xval*)
+                                 alt-code
+                                 #`(values #,alt-code #,@xval*)))
+                           ; TODO: if there were no user provided clauses for this input alt,
+                           ; we could raise a compile time error here, otherwise we have to rely
+                           ; on the runtime error
+                           #`(error '#,(pass-desc-name pass-desc)
+                               (format "no matching clause for input ~s in processor ~s"
+                               '#,(alt-syn alt)
+                               '#,(pdesc-name pdesc))
+                               #,fml)))])))
 
               (define gen-binding (lambda (t v) (if (eq? t v) '() (list #`(#,t #,v)))))
               (define gen-t (lambda (acc) (if (identifier? acc) acc (gentemp))))

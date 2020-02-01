@@ -772,33 +772,31 @@
                       (or (f (ntspec-alts (nonterminal-alt-ntspec alt)))
                           (f (cdr alt*)))
                       (if (pred? alt) alt (f (cdr alt*)))))))))
-      (let ([syn (alt-syn ialt)])
-        (cond
-          [(terminal-alt? ialt)
-           (let ([type (syntax->datum (tspec-type (terminal-alt-tspec ialt)))])
-             (scan-alts
-               (lambda (alt)
-                 (and (terminal-alt? alt)
-                      (eq? (syntax->datum (tspec-type (terminal-alt-tspec alt))) type)))))]
-          [(pair-alt? ialt)
-           (if (pair-alt-implicit? ialt)
-               (let ([pattern (pair-alt-pattern ialt)])
-                 (scan-alts
-                   (lambda (alt)
-                     (and (pair-alt? alt)
-                          (pair-alt-implicit? alt)
-                          (let ([apattern (pair-alt-pattern alt)])
-                            (equal? apattern pattern))))))
-               (let ([pattern (pair-alt-pattern ialt)])
-                 (scan-alts
-                   (lambda (alt)
-                     (and (pair-alt? alt)
-                          (not (pair-alt-implicit? alt))
-                          (let ([asyn (alt-syn alt)])
-                            (let ([apattern (pair-alt-pattern alt)])
-                              (and (eq? (syntax->datum (car asyn)) (syntax->datum (car syn)))
-                                   (equal? apattern pattern)))))))))]
-          [else (error who "unexpected alt" ialt)]))))
+      (cond
+        [(terminal-alt? ialt)
+         (let ([type (syntax->datum (tspec-type (terminal-alt-tspec ialt)))])
+           (scan-alts
+             (lambda (alt)
+               (and (terminal-alt? alt)
+                    (eq? (syntax->datum (tspec-type (terminal-alt-tspec alt))) type)))))]
+        [(pair-alt? ialt)
+         (if (pair-alt-implicit? ialt)
+             (let ([pattern (pair-alt-pattern ialt)])
+               (scan-alts
+                 (lambda (alt)
+                   (and (pair-alt? alt)
+                        (pair-alt-implicit? alt)
+                        (let ([apattern (pair-alt-pattern alt)])
+                          (equal? apattern pattern))))))
+             (let ([pattern (pair-alt-pattern ialt)])
+               (scan-alts
+                 (lambda (alt)
+                   (and (pair-alt? alt)
+                        (not (pair-alt-implicit? alt))
+                        (let ([apattern (pair-alt-pattern alt)])
+                          (and (eq? (syntax->datum (car (alt-syn alt))) (syntax->datum (car (alt-syn ialt))))
+                               (equal? apattern pattern))))))))]
+        [else (error who "unexpected alt" ialt)])))
 
   ;; record type used to transport data in the compile-time environment.
   (define-record-type pass-info
