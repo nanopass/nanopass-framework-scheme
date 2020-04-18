@@ -10,12 +10,14 @@
     Llanguage unparse-Llanguage
     meta-variable-suffix-checker
     check-and-finish-language
-    Lannotated unparse-Lannotated
+    Lannotated unparse-Lannotated Lannotated? Lannotated-Defn? Lannotated-Terminal? Lannotated-Nonterminal?
     annotate-language
     star? modifier?
     Lpass unparse-Lpass
     lookup-language)
-  (import (rnrs) (nanopass) (nanopass helpers) (nanopass prefix-matcher) (only (chezscheme) box box? set-box! unbox make-parameter record-constructor-descriptor?))
+  (import (rnrs) (nanopass) (nanopass helpers) (nanopass prefix-matcher)
+    (only (chezscheme) box box? set-box! unbox make-parameter
+      record-constructor-descriptor? eq-hashtable-update!))
 
   (define-nanopass-record)
 
@@ -166,7 +168,7 @@
            (fold-right (lambda (cl cl*) (ExtendClause cl term* nt* cl*)) '() cl*)]))
       (define-pass rewrite-annotated-term : (Lannotated Terminal) (ir) -> (Lcomplete Terminal) ()
         (Terminal : Terminal (ir) -> Terminal ()
-          [(,id (,id* ...) ,handler? ,pred)
+          [(,id (,id* ...) ,b ,handler? ,pred)
            (if handler?
                `(=> (,id (,id* ...)) ,handler?)
                `(,id (,id* ...)))]))
@@ -229,7 +231,7 @@
               (errorf who "could not find terminal matching (~s ~s)" (syntax->datum id0) (map syntax->datum id0*))
               (let ([old-term (car old-term*)] [old-term* (cdr old-term*)])
                 (nanopass-case (Lannotated Terminal) old-term
-                  [(,id (,id* ...) ,handler? ,pred)
+                  [(,id (,id* ...) ,b ,handler? ,pred)
                    (if (and (eq? (syntax->datum id) (syntax->datum id0))
                             (equal? (syntax->datum id*) (syntax->datum id0*)))
                        old-term*
@@ -278,7 +280,7 @@
           (if (null? old-nt*)
               '()
               (nanopass-case (Lannotated Nonterminal) (car old-nt*)
-                [(,id0 (,id* ...) ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
+                [(,id0 (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
                  (if (eq? (syntax->datum id0) (syntax->datum id))
                      prod*
                      (loop (cdr old-nt*)))]))))
@@ -386,10 +388,15 @@
     (terminals
       (+ (box (b))))
     (Clause (cl)
-      (- (entry id))
-      (+ (entry ref)))
+      (- (entry id)
+         (id (id* ...) prod* ...))
+      (+ (entry ref)
+         (id (id* ...) b prod* ...)))
     (Reference (ref)
       (+ (reference id0 id1 b)))
+    (SimpleTerminal (simple-term)
+      (- (id (id* ...)))
+      (+ (id (id* ...) b)))
     (Pattern (pattern)
       (- (maybe id))
       (+ ref
@@ -456,23 +463,14 @@
       (define (build-ref mv id b)
         (with-output-language (Llanguage Reference)
           `(reference ,mv ,id ,b)))
-      (define (set-ref! ht id x)
-        (let* ([sym (syntax->datum id)]
-               [val (hashtable-ref ht sym #f)])
-          (cond
-            [(eq? val #f) (syntax-violation who "unexpected terminal or nonterminal id" id)]
-            [(box? val) (syntax-violation who "terminal or nonterminal listed more than once" id)]
-            [(null? val) (hashtable-set! ht sym (box x))]
-            [else (for-each (lambda (b) (set-box! b x)) val) (hashtable-set! ht sym (car val))])))
       (define ref
         (case-lambda
           [(ht id)
-           (let* ([sym (syntax->datum id)]
-                  [val (hashtable-ref ht sym #f)])
-             (cond
-               [(eq? val #f) (syntax-violation who "unexpected terminal or nonterminal id" id)]
-               [(box? val) val]
-               [else (let ([b (box #f)]) (hashtable-set! ht sym (cons b val)) b)]))]
+           (let ([sym (syntax->datum id)])
+             (or (eq-hashtable-ref ht sym #f)
+                 (let ([b (box #f)])
+                   (eq-hashtable-set! ht sym b)
+                   b)))]
           [(pt ht id)
            (let* ([str (symbol->string (syntax->datum id))]
                   [raw-id (match-prefix pt str (meta-variable-suffix-checker))])
@@ -493,7 +491,7 @@
       [(terminals ,term* ...) (fold-left (lambda (pt term) (ExtendMapsTerminal term pt ht)) pt term*)]
       [(,id (,id* ...) ,prod* ...)
        ;; should we be using an identifier hashtable? or symbol hashtable?
-       (eq-hashtable-set! ht (syntax->datum id) '())
+       (eq-hashtable-set! ht (syntax->datum id) (box #f))
        (fold-left (lambda (pt mv-id) (insert-prefix pt (symbol->string (syntax->datum mv-id)) id)) pt id*)]
       [else pt])
     (ExtendMapsTerminal : Terminal (term pt ht) -> * (pt)
@@ -501,11 +499,19 @@
       [(=> ,simple-term ,handler) (ExtendMapsSimpleTerminal simple-term pt ht)])
     (ExtendMapsSimpleTerminal : SimpleTerminal (simple-term pt ht) -> * (pt)
       [(,id (,id* ...))
-       (eq-hashtable-set! ht (syntax->datum id) '())
+       (eq-hashtable-set! ht (syntax->datum id) (box #f))
        (fold-left (lambda (pt mv-id) (insert-prefix pt (symbol->string (syntax->datum mv-id)) id)) pt id*)])
     (Terminal : Terminal (term ht) -> Terminal ()
-      [(,id (,id* ...)) (let ([term `(,id (,id* ...))]) (set-ref! ht id term) term)]
-      [(=> (,id (,id* ...)) ,handler) (let ([term `(=> (,id (,id* ...)) ,handler)]) (set-ref! ht id term) term)]
+      [(,id (,id* ...))
+       (let* ([b (ref ht id)]
+              [term `(,id (,id* ...) ,b)])
+         (set-box! b term)
+         term)]
+      [(=> (,id (,id* ...)) ,handler)
+       (let* ([b (ref ht id)]
+             [term `(=> (,id (,id* ...) ,b) ,handler)])
+         (set-box! b term)
+         term)]
       [,simple-term (errorf who "unreachable match ,simple-term, reached!")]
       [(=> ,simple-term ,handler) (errorf who "unreachable match (=> ,simple-term ,handler), reached!")])
     (Clause : Clause (cl pt ht) -> Clause ()
@@ -513,9 +519,10 @@
       [(nongenerative-id ,id) `(nongenerative-id ,id)]
       [(terminals ,term* ...) (errorf who "unexpected terminal clause after terminals were filtered")]
       [(,id (,id* ...) ,prod* ...)
-       (let* ([prod* (map (lambda (prod) (Production prod pt ht)) prod*)]
-              [cl `(,id (,id* ...) ,prod* ...)])
-         (set-ref! ht id cl)
+       (let* ([b (ref ht id)]
+              [prod* (map (lambda (prod) (Production prod pt ht)) prod*)]
+              [cl `(,id (,id* ...) ,b ,prod* ...)])
+         (set-box! b cl)
          cl)])
     (Production : Production (prod pt ht) -> Production ()
       [,pattern (Pattern pattern pt ht)]
@@ -553,9 +560,9 @@
       (- (entry ref)
          (nongenerative-id id)
          (terminals term* ...)
-         (id (id* ...) prod* ...)))
+         (id (id* ...) b prod* ...)))
     (Nonterminal (nt)
-      (+ (id (id* ...) rtd rcd tag pred all-pred all-term-pred prod* ...)))
+      (+ (id (id* ...) b rtd rcd tag pred all-pred all-term-pred prod* ...)))
     (PrettyProduction (pretty-prod)
       (+ (procedure handler)
          (pretty pattern)))
@@ -575,41 +582,33 @@
       (- simple-term
          (=> (=> simple-term handler)
              (=> simple-term handler)))
-      (+ (id (id* ...) (maybe handler) pred)))
+      (+ (id (id* ...) b (maybe handler) pred)))
     (SimpleTerminal (simple-term)
-      (- (id (id* ...)))))
+      (- (id (id* ...) b))))
 
   ;; TODO: fix the entry for language extenions
   (define-pass annotate-language : Llanguage (lang) -> Lannotated ()
     (definitions
-      (define (add-reference! references id b)
-        (hashtable-update! references (syntax->datum id) (lambda (v) (cons b v)) '()))
-      (define (update-references! references id x)
-        (let ([ls (hashtable-ref references (syntax->datum id) '())])
-          (for-each (lambda (b) (set-box! b x)) ls)
-          (hashtable-delete! references (syntax->datum id))
-          x))
-      (define-pass build-ref : (Llanguage Clause) (cl references) -> (Llanguage Reference) ()
+      (define-pass build-ref : (Llanguage Clause) (cl) -> (Llanguage Reference) ()
         (build-ref : Clause (cl) -> Reference ()
-          [(,id (,id* ...) ,prod* ...) (let ([b (box cl)]) (add-reference! references id b) `(reference ,id ,id ,b))]
+          [(,id (,id* ...) ,b ,prod* ...) `(reference ,id ,id ,b)]
           [else (errorf who "unexpected clause ~s" (unparse-Llanguage cl))]))
       (define (separate-clauses cl*)
-        (let ([references (make-eq-hashtable)])
-          (let loop ([cl* cl*] [entry #f] [first-nt #f] [nongen-id #f] [rterm* '()] [rnt* '()])
-            (if (null? cl*)
-                (values references (or entry (build-ref first-nt references)) nongen-id (reverse rterm*) (reverse rnt*))
-                (with-values
-                  (BinClause (car cl*) references entry first-nt nongen-id rterm* rnt*)
-                  (lambda (entry first-nt nongen-id rterm* rnt*)
-                    (loop (cdr cl*) entry first-nt nongen-id rterm* rnt*)))))))
-      (define (annotate-terminals term* references) (map (lambda (t) (Terminal t references)) term*))
-      (define (annotate-nonterminals nt* references lang-name lang-rtd lang-rcd nongen-id)
+        (let loop ([cl* cl*] [entry #f] [first-nt #f] [nongen-id #f] [rterm* '()] [rnt* '()])
+          (if (null? cl*)
+              (values (or entry (build-ref first-nt)) nongen-id (reverse rterm*) (reverse rnt*))
+              (with-values
+                (BinClause (car cl*) entry first-nt nongen-id rterm* rnt*)
+                (lambda (entry first-nt nongen-id rterm* rnt*)
+                  (loop (cdr cl*) entry first-nt nongen-id rterm* rnt*))))))
+      (define (annotate-terminals term*) (map Terminal term*))
+      (define (annotate-nonterminals nt* lang-name lang-rtd lang-rcd nongen-id)
         (let ([bits (fxlength (length nt*))])
           (let f ([nt* nt*] [tag 0])
             (if (null? nt*)
                 '()
                 (cons
-                  (Nonterminal (car nt*) references lang-name lang-rtd lang-rcd bits tag nongen-id)
+                  (Nonterminal (car nt*) lang-name lang-rtd lang-rcd bits tag nongen-id)
                   (f (cdr nt*) (fx+ tag 1)))))))
       (define (build-production pattern nt-rtd lang-name nt-name tag pretty nongen-id)
         (let* ([prod-name (nanopass-case (Llanguage Pattern) pattern
@@ -655,7 +654,7 @@
       )
     (Defn : Defn (def) -> Defn ()
       [(define-language ,id ,cl* ...)
-       (let-values ([(references entry nongen-id term* nt*) (separate-clauses cl*)])
+       (let-values ([(entry nongen-id term* nt*) (separate-clauses cl*)])
          (let* ([rtd (make-record-type-descriptor (syntax->datum id)
                        (record-type-descriptor nanopass-record)
                        (if nongen-id (syntax->datum nongen-id) (gensym (unique-name id)))
@@ -663,12 +662,12 @@
                 [rcd (make-record-constructor-descriptor rtd
                        (record-constructor-descriptor nanopass-record) #f)]
                 [tag-mask (fx- (fxarithmetic-shift-left 1 (fxlength (length nt*))) 1)]
-                [term* (annotate-terminals term* references)]
-                [nt* (annotate-nonterminals nt* references id rtd rcd nongen-id)])
+                [term* (annotate-terminals term*)]
+                [nt* (annotate-nonterminals nt* id rtd rcd nongen-id)])
            (let-values ([(ref ref-id) (Reference entry)]) 
              `(define-language ,id ,ref ,nongen-id ,rtd ,rcd ,tag-mask (,term* ...) ,nt* ...))))])
-    (BinClause : Clause (cl references entry first-nt nongen-id rterm* rnt*) -> * (entry first-nt nongen-id rterm* rnt*)
-      [(entry ,[RecordRef : ref references ->])
+    (BinClause : Clause (cl entry first-nt nongen-id rterm* rnt*) -> * (entry first-nt nongen-id rterm* rnt*)
+      [(entry ,ref)
        (when entry (errorf who "found more than one entry"))
        (values ref first-nt nongen-id rterm* rnt*)]
       [(nongenerative-id ,id)
@@ -676,34 +675,20 @@
        (values entry first-nt id rterm* rnt*)]
       [(terminals ,term* ...)
        (values entry first-nt nongen-id (append term* rterm*) rnt*)]
-      [(,id (,id* ...) ,[RecordProd : prod* references ->] ...)
+      [(,id (,id* ...) ,b ,prod* ...)
        (values entry (or first-nt cl) nongen-id rterm* (cons cl rnt*))])
-    (RecordProd : Production (prod references) -> * ()
-      [,pattern (RecordPattern pattern references)]
-      [(=> ,[RecordPattern : pattern0 references ->] ,pattern1) (values)]
-      [(-> ,[RecordPattern : pattern references ->] ,handler) (values)])
-    (RecordPattern : Pattern (pattern references) -> * ()
-      [,id (values)]
-      [,ref (RecordRef ref references)]
-      [(maybe ,[RecordRef : ref references ->]) (values)]
-      [(,[RecordPattern : pattern references ->] ,dots) (values)]
-      [(,[RecordPattern : pattern0 references ->] ,dots
-        ,[RecordPattern : pattern1 references ->] ... .
-        ,[RecordPattern : pattern2 references ->])
-       (values)]
-      [(,[RecordPattern : pattern0 references ->] . ,[RecordPattern : pattern1 references ->])
-       (values)]
-      [,null (values)])
-    (RecordRef : Reference (ref references) -> * ()
-      [(reference ,id0 ,id1 ,b) (add-reference! references id1 b) (values)])
-    (Terminal : Terminal (term references) -> Terminal ()
-      [(,id (,id* ...))
-       (update-references! references id `(,id (,id* ...) #f ,(construct-id id id "?")))]
-      [(=> (,id (,id* ...)) ,handler)
-       (update-references! references id `(,id (,id* ...) ,handler ,(construct-id id id "?")))]
+    (Terminal : Terminal (term ) -> Terminal ()
+      [(,id (,id* ...) ,b)
+       (let ([term `(,id (,id* ...) ,b #f ,(construct-id id id "?"))])
+         (set-box! b term)
+         term)]
+      [(=> (,id (,id* ...) ,b) ,handler)
+       (let ([term `(,id (,id* ...) ,b ,handler ,(construct-id id id "?"))])
+         (set-box! b term)
+         term)]
       [else (errorf who "unexpected terminal ~s" (unparse-Llanguage term))])
-    (Nonterminal : Clause (cl references lang-name lang-rtd lang-rcd bits tag nongen-id) -> Nonterminal ()
-      [(,id (,id* ...) ,prod* ...)
+    (Nonterminal : Clause (cl lang-name lang-rtd lang-rcd bits tag nongen-id) -> Nonterminal ()
+      [(,id (,id* ...) ,b ,prod* ...)
        (let* ([record-name (unique-name lang-name id)]
               [rtd (make-record-type-descriptor
                      (string->symbol record-name)
@@ -720,8 +705,9 @@
               [all-term-pred (construct-id #'* lang-name "-" id "-terminal?")])
          (let loop ([prod* prod*] [next 1] [rprod* '()])
            (if (null? prod*)
-               (update-references! references id
-                 `(,id (,id* ...) ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,(reverse rprod*) ...))
+               (let ([nt `(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,(reverse rprod*) ...)])
+                 (set-box! b nt)
+                 nt)
                (let ([prod-tag (fx+ (fxarithmetic-shift-left next bits) tag)])
                  (loop
                    (cdr prod*)

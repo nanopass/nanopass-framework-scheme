@@ -4,7 +4,9 @@
     inspect-language lookup-language
     Llanguage unparse-Llanguage
     Lannotated unparse-Lannotated)
-  (import (rnrs) (nanopass) (nanopass experimental) (only (chezscheme) make-compile-time-value trace-define-syntax))
+  (import (rnrs) (nanopass) (nanopass experimental) (nanopass helpers)
+    (only (chezscheme) make-compile-time-value trace-define-syntax unbox
+      optimize-level enumerate with-output-to-string errorf))
 
   (define-syntax define-language-exp
     (lambda (x)
@@ -15,9 +17,12 @@
                [lang-annotated (annotate-language lang)])
           (nanopass-case (Llanguage Defn) lang
             [(define-language ,id ,cl* ...)
-             #`(define-syntax #,id
-                 (make-compile-time-value
-                   (make-language-information '#,lang '#,lang-annotated)))])))))
+             #`(begin
+                 (define-syntax #,id
+                   (make-compile-time-value
+                     (make-language-information '#,lang '#,lang-annotated)))
+                 (define-language-records #,id)
+                 (define-language-predicates #,id))])))))
 
   (define-syntax inspect-language
     (lambda (x)
@@ -35,4 +40,142 @@
                        '#,(datum->syntax #'* (unparse-Lannotated a))))
                  (syntax-violation 'inspect-language "no language found" #'name)))]))))
 
+  (define (build-list-of-string level name)
+    (with-output-to-string
+      (lambda ()
+        (let loop! ([level level])
+          (if (fx=? level 0)
+              (write name)
+              (begin (display "list of ") (loop! (fx- level 1))))))))
+
+  (define-syntax define-language-records
+    (lambda (x)
+      (define-pass construct-records : Lannotated (ir) -> * (stx)
+        (definitions
+          (define (build-field-check name mv level pred)
+            #`(lambda (x msg)
+                (define (squawk level x)
+                  (if msg
+                      (errorf who "expected ~a but received ~s in field ~s from ~a"
+                        (build-list-of-string level '#,name) x '#,mv msg)
+                      (errorf who "expected ~a but received ~s in field ~s"
+                        (build-list-of-string level '#,name) x '#,mv)))
+                #,(let f ([level level])
+                    (if (fx=? level 0)
+                        #`(lambda (x) (unless (#,pred x) (squawk #,level x)))
+                        #`(lambda (x)
+                            (let loop ([x x])
+                              (cond
+                                [(pair? x) (#,(f (fx- level 1)) (car x))]
+                                [(null? x)]
+                                [else (squawk #,level x)]))))))))
+        (Defn : Defn (ir) -> * (stx)
+          [(define-language ,id ,ref ,id0? ,rtd ,rcd ,tag-mask (,term* ...) ,[nt*] ...)
+           #`(begin #,@nt*)])
+        (Nonterminal : Nonterminal (ir) -> * (stx)
+          [(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
+           (let ([stx* (map (lambda (prod) (Production prod rcd)) prod*)])
+             #`(begin (define #,pred (record-predicate '#,rtd)) #,@stx*))])
+        (Production : Production (ir nt-rcd) -> * (stx)
+          [(production ,pattern ,pretty-prod? ,rtd ,tag ,pred ,maker ,[mv* acc* check*] ...)
+           (with-syntax ([(mv* ...) mv*]
+                         [(msg* ...) (generate-temporaries mv*)]
+                         [(check* ...) check*]
+                         [(acc* ...) acc*]
+                         [(idx ...) (enumerate acc*)])
+             #`(begin
+                 (define #,maker
+                   (let ()
+                     (define maker
+                       (record-constructor
+                         (make-record-constructor-descriptor '#,rtd '#,nt-rcd
+                           (lambda (pargs->new)
+                             (lambda (mv* ...)
+                               ((pargs->new #,tag) mv* ...))))))
+                     (lambda (who mv* ... msg* ...)
+                       #,@(if (fx=? (optimize-level) 3)
+                              '()
+                              #`((check* mv* msg*) ...))
+                       (maker mv* ...))))
+                 (define #,pred (record-predicate '#,rtd))
+                 (define acc* (record-accessor '#,rtd idx)) ...))]
+          [else #'(begin)])
+        (Field : Field (ir) -> * (mv check acc)
+          [(,[mv name pred] ,level ,accessor)
+           (values mv accessor (build-field-check name mv level pred))]
+          [(optional ,[mv name pred] ,level ,accessor)
+           (values mv accessor 
+             (build-field-check name mv level
+               #`(lambda (x) (or (eq? x #f) (#,pred x)))))])
+        (Reference : Reference (ir) -> * (mv name pred)
+          [(reference ,id0 ,id1 ,b)
+           (let-values ([(name pred) (let ([r (unbox b)])
+                                       (if (Lannotated-Terminal? r)
+                                           (TerminalPred r)
+                                           (NonterminalPred r)))])
+             (values id0 name pred))])
+        (TerminalPred : Terminal (ir) -> * (name pred)
+          [(,id (,id* ...) ,b ,handler? ,pred) (values id pred)])
+        (NonterminalPred : Nonterminal (ir) -> * (name pred)
+          [(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
+           (values id all-pred)])
+        (Defn ir))
+      (syntax-case x ()
+        [(_ name)
+         (lambda (rho)
+           (let ([lang (lookup-language rho #'name)])
+             (construct-records (language-information-annotated-language lang))))])))
+
+  (define-syntax define-language-predicates
+    (lambda (x)
+      (define-pass language-predicates : Lannotated (ir) -> * (stx)
+        (definitions
+          (define (set-cons x ls)
+            (if (memq x ls)
+                ls
+                (cons x ls))))
+        (Defn : Defn (ir) -> * (stx)
+          [(define-language ,id ,ref ,id0? ,rtd ,rcd ,tag-mask (,term* ...) ,nt* ...)
+           (let loop ([nt* nt*] [ntpreddef* '()] [tpred* '()])
+             (if (null? nt*)
+                 (with-syntax ([pred (construct-id id id "?")]
+                               [(tpred* ...) tpred*])
+                   #`(begin
+                       (define pred
+                         (lambda (x)
+                           (or ((record-predicate '#,rtd) x) (tpred* x) ...)))
+                       #,@ntpreddef*))
+                 (let-values ([(ntpreddef* tpred*) (Nonterminal (car nt*) ntpreddef* tpred*)])
+                   (loop (cdr nt*) ntpreddef* tpred*))))])
+        (Nonterminal : Nonterminal (nt ntpreddef* lang-tpred*) -> * (ntpreddef* lang-tpred*)
+          [(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
+           (let loop ([prod* prod*] [pred* '()] [lang-tpred* lang-tpred*])
+             (if (null? prod*)
+                 (values
+                   (cons
+                     (with-syntax ([(pred* ...) pred*])
+                       #`(define #,all-pred
+                           (lambda (x)
+                             (or ((record-predicate '#,rtd) x) (pred* x) ...))))
+                     ntpreddef*)
+                   lang-tpred*)
+                 (let-values ([(tpred* lang-tpred*) (Production (car prod*) pred* lang-tpred*)])
+                   (loop (cdr prod*) tpred* lang-tpred*))))])
+        (Production : Production (ir pred* lang-tpred*) -> * (pred* lang-tpred*)
+          [(terminal (reference ,id0 ,id1 ,b) ,pretty-prod?)
+           (let ([pred (TerminalPred (unbox b))])
+             (values (cons pred pred*) (set-cons pred lang-tpred*)))]
+          [(nonterminal (reference ,id0 ,id1 ,b) ,pretty-prod?)
+           (values (cons (NonterminalPred (unbox b)) pred*) lang-tpred*)]
+          [else (values pred* lang-tpred*)])
+        (TerminalPred : Terminal (ir) -> * (pred)
+          [(,id (,id* ...) ,b ,handler? ,pred) pred])
+        (NonterminalPred : Nonterminal (ir) -> * (pred)
+          [(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...) all-pred])
+        (Defn ir))
+      (syntax-case x ()
+        [(_ name)
+         (lambda (rho)
+           (let ([lang (lookup-language rho #'name)])
+             (language-predicates (language-information-annotated-language lang))))])))
   )
