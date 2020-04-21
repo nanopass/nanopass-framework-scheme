@@ -3,26 +3,37 @@
     define-language-exp
     inspect-language lookup-language
     Llanguage unparse-Llanguage
-    Lannotated unparse-Lannotated)
+    Lannotated unparse-Lannotated
+    language->s-expression-exp
+    prune-language-exp
+    define-pruned-language-exp
+    diff-languages-exp
+    define-language-node-counter-exp
+    define-unparser-exp
+    define-parser-exp
+    )
   (import (rnrs) (nanopass) (nanopass experimental) (nanopass helpers)
     (only (chezscheme) make-compile-time-value trace-define-syntax unbox
       optimize-level enumerate with-output-to-string errorf))
 
-  (define-syntax define-language-exp
+
+  (trace-define-syntax define-language-exp
     (lambda (x)
       (lambda (rho)
-        (let* ([lang (parse-np-source x 'define-language-exp)]
-               [lang (handle-language-extension lang 'define-language-exp rho)]
-               [lang (check-and-finish-language lang)]
-               [lang-annotated (annotate-language lang)])
-          (nanopass-case (Llanguage Defn) lang
-            [(define-language ,id ,cl* ...)
-             #`(begin
-                 (define-syntax #,id
-                   (make-compile-time-value
-                     (make-language-information '#,lang '#,lang-annotated)))
-                 (define-language-records #,id)
-                 (define-language-predicates #,id))])))))
+        (syntax-case x ()
+          [(_ . rest)
+           (let* ([lang (parse-np-source x 'define-language-exp)]
+                  [lang (handle-language-extension lang 'define-language-exp rho)]
+                  [lang (check-and-finish-language lang)]
+                  [lang-annotated (annotate-language lang)])
+             (nanopass-case (Llanguage Defn) lang
+               [(define-language ,id ,cl* ...)
+                #`(begin
+                    (define-language . rest)
+                    (define-property #,id experimental-language
+                      (make-language-information '#,lang '#,lang-annotated))
+                    (define-language-records #,id)
+                    #;(define-language-predicates #,id))]))]))))
 
   (define-syntax inspect-language
     (lambda (x)
@@ -48,7 +59,7 @@
               (write name)
               (begin (display "list of ") (loop! (fx- level 1))))))))
 
-  (define-syntax define-language-records
+  (trace-define-syntax define-language-records
     (lambda (x)
       (define-pass construct-records : Lannotated (ir) -> * (stx)
         (definitions
@@ -178,4 +189,111 @@
          (lambda (rho)
            (let ([lang (lookup-language rho #'name)])
              (language-predicates (language-information-annotated-language lang))))])))
+
+  (define-syntax language->s-expression-exp
+    (lambda (x)
+      (define-pass lang->sexp : Llanguage (ir) -> * (sexp)
+        (Defn : Defn (ir) -> * (sexp)
+          [(define-language ,id ,[cl*] ...)
+           `(define-language ,(syntax->datum id) . ,cl*)])
+        (Clause : Clause (ir) -> * (sexp)
+          [(entry ,[sym]) `(entry ,sym)]
+          [(nongenerative-id ,id)
+           `(nongenerative-id ,(syntax->datum id))]
+          [(terminals ,[term*] ...)
+           `(terminals . ,term*)]
+          [(,id (,id* ...) ,b ,[prod*] ...)
+           `(,(syntax->datum id) ,(map syntax->datum id*) . ,prod*)])
+        (Terminal : Terminal (ir) -> * (sexp)
+          [,simple-term (SimpleTerminal simple-term)]
+          [(=> ,[simple-term] ,handler)
+           `(=> ,simple-term ,(syntax->datum handler))])
+        (SimpleTerminal : SimpleTerminal (ir) -> * (sexp)
+          [(,id (,id* ...) ,b)
+           `(,(syntax->datum id) ,(map syntax->datum id*))])
+        (Production : Production (ir) -> * (sexp)
+          [,pattern (Pattern pattern)]
+          [(=> ,[pattern0] ,[pattern1])
+           `(=> ,pattern0 ,pattern1)]
+          [(-> ,[pattern] ,handler)
+           `(-> ,pattern ,(syntax->datum handler))])
+        (Pattern : Pattern (ir) -> * (sexp)
+          [(maybe ,[sym]) `(maybe ,sym)]
+          [,ref (Reference ref)]
+          [,id (syntax->datum id)]
+          [(,[pattern] ,dots) `(,pattern ...)]
+          [(,[pattern0] ,dots ,[pattern1] ... . ,[pattern2])
+           `(,pattern0 ... ,@pattern1 . ,pattern2)]
+          [(,[pattern0] . ,[pattern1])
+           `(,pattern0 . ,pattern1)]
+          [,null '()])
+        (Reference : Reference (ir) -> * (sym)
+          [(reference ,id0 ,id1 ,b) (syntax->datum id0)])
+        (Defn ir))
+      (syntax-case x ()
+        [(_ name)
+         (lambda (rho)
+           (let ([lang (lookup-language rho #'name)])
+             #`'#,(datum->syntax #'*
+                    (lang->sexp
+                      (language-information-language lang)))))])))
+
+  (define-syntax prune-language-exp
+    (lambda (x)
+      (syntax-case x ()
+        [(_ name)
+         (lambda (rho)
+           (let ([lang (lookup-language rho #'name)])
+             (with-syntax ([pl (prune-lang
+                                 (language-information-annotated-language lang)
+                                 'prune-language-exp
+                                 #f)])
+               #'(quote pl))))])))
+
+  (define-syntax define-pruned-language-exp
+    (lambda (x)
+      (syntax-case x ()
+        [(_ name new-name)
+         (lambda (rho)
+           (let ([lang (lookup-language rho #'name)])
+             (prune-lang
+               (language-information-annotated-language lang)
+               'define-pruned-language-exp
+               #'new-name)))])))
+
+  (define-syntax diff-languages-exp
+    (lambda (x)
+      (syntax-case x ()
+        [(_ name0 name1)
+         (lambda (rho)
+           (let ([lang0 (lookup-language rho #'name0)]
+                 [lang1 (lookup-language rho #'name1)])
+             (with-syntax ([diff (diff-langs
+                                   (language-information-language lang0)
+                                   (language-information-language lang1))])
+               #'(quote diff))))])))
+
+  (trace-define-syntax define-language-node-counter-exp
+    (lambda (x)
+      (syntax-case x ()
+        [(_ name lang)
+         (lambda (rho)
+           (let ([l (lookup-language rho #'lang)])
+             (build-lang-node-counter (language-information-annotated-language l) #'name)))])))
+
+  (trace-define-syntax define-unparser-exp
+    (lambda (x)
+      (syntax-case x ()
+        [(_ name lang)
+         (lambda (rho)
+           (let ([l (lookup-language rho #'lang)])
+             (build-unparser (language-information-annotated-language l) #'name)))])))
+
+  (trace-define-syntax define-parser-exp
+    (lambda (x)
+      (syntax-case x ()
+        [(_ name lang)
+         (lambda (rho)
+           (let ([l (lookup-language rho #'lang)])
+             (build-parser (language-information-annotated-language l) #'name)))])))
   )
