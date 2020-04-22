@@ -221,9 +221,8 @@
           [(maybe ,[sym]) `(maybe ,sym)]
           [,ref (Reference ref)]
           [,id (syntax->datum id)]
-          [(,[pattern] ,dots) `(,pattern ...)]
-          [(,[pattern0] ,dots ,[pattern1] ... . ,[pattern2])
-           `(,pattern0 ... ,@pattern1 . ,pattern2)]
+          [(,[pattern0] ,dots . ,[pattern1])
+           `(,pattern0 ... . ,pattern1)]
           [(,[pattern0] . ,[pattern1])
            `(,pattern0 . ,pattern1)]
           [,null '()])

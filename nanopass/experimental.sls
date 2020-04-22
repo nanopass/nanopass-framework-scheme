@@ -143,8 +143,7 @@
     (Pattern (pattern)
       (+ id
          (maybe id)
-         (pattern dots)
-         (pattern0 dots pattern1 ... . pattern2)
+         (pattern0 dots . pattern1)
          (pattern0 . pattern1)
          null)))
 
@@ -214,9 +213,7 @@
           [,id id]
           [,ref (Reference ref)]
           [(maybe ,[pattern]) `(maybe ,pattern)]
-          [(,[pattern] ,dots) `(,pattern ,dots)]
-          [(,[pattern0] ,dots ,[pattern1] ... . ,[pattern2])
-           `(,pattern0 ,dots ,pattern1 ... . ,pattern2)]
+          [(,[pattern0] ,dots . ,[pattern1]) `(,pattern0 ,dots . ,pattern1)]
           [(,[pattern0] . ,[pattern1]) `(,pattern0 . ,pattern1)]
           [,null null]))
       (define-pass rewrite-annotated-nt : (Lannotated Nonterminal) (ir) -> (Lcomplete Clause) ()
@@ -271,14 +268,10 @@
           [,id (and (identifier? stx) (eq? (syntax->datum id) (syntax->datum stx)))]
           [,ref (Reference ref stx)]
           [(maybe ,[b?]) b?]
-          [(,pattern ,dots)
+          [(,pattern0 ,dots . ,pattern1)
            (syntax-case stx ()
-             [(stx dots) (dots? #'dots) (Pattern pattern #'stx)]
-             [_ #f])]
-          [(,pattern0 ,dots ,pattern1 ... . ,pattern2)
-           (syntax-case stx ()
-             [(p0 dots p1 ... . p2) (dots? #'dots)
-              (and (Pattern pattern0 #'p0) (for-all Pattern pattern1 #'(p1 ...)) (Pattern pattern2 #'p2))]
+             [(p0 dots . p1) (dots? #'dots)
+              (and (Pattern pattern0 #'p0) (Pattern pattern1 #'p1))]
              [_ #f])]
           [(,pattern0 . ,pattern1)
            (syntax-case stx ()
@@ -402,12 +395,9 @@
         [(maybe ?id)
          (and (maybe? #'maybe) (identifier? #'?id))
          `(maybe ,#'?id)]
-        [(?pattern dots)
+        [(?pattern0 dots . ?pattern1)
          (ellipsis? #'dots)
-         `(,(Pattern #'?pattern) ,#'dots)]
-        [(?pattern0 dots ?pattern1 . ?pattern2)
-         (ellipsis? #'dots)
-         `(,(Pattern #'?pattern0) ,#'dots ,(Pattern #'?pattern1) . ,(Pattern #'?pattern2))]
+         `(,(Pattern #'?pattern0) ,#'dots . ,(Pattern #'?pattern1))]
         [(?pattern0 . ?pattern1)
          `(,(Pattern #'?pattern0) . ,(Pattern #'?pattern1))]
         [() '()])))
@@ -560,8 +550,7 @@
     (Pattern : Pattern (pattern pt ht) -> Pattern ()
       [,id (maybe-ref pt ht id)]
       [(maybe ,id) (ref pt ht id)]
-      [(,[pattern] ,dots) `(,pattern ,dots)]
-      [(,[pattern0] ,dots ,[pattern1] ... . ,[pattern2]) `(,pattern0 ,dots ,pattern1 ... . ,pattern2)]
+      [(,[pattern0] ,dots . ,[pattern1]) `(,pattern0 ,dots . ,pattern1)]
       [(,[pattern0] . ,[pattern1]) `(,pattern0 . ,pattern1)]
       [,null null])
     )
@@ -642,15 +631,12 @@
       (define (build-production pattern nt-rtd lang-name nt-name tag pretty nongen-id)
         (let* ([prod-name (nanopass-case (Llanguage Pattern) pattern
                             [,id id]
-                            [(,id ,dots) id]
-                            [(,id0 ,dots ,pattern1 ... . ,pattern2) id0]
+                            [(,id0 ,dots . ,pattern1) id0]
                             [(,id0 . ,pattern1) id0]
-                            [((reference ,id0 ,id1 ,b)  ,dots) id0]
-                            [((reference ,id0 ,id1 ,b) ,dots ,pattern1 ... . ,pattern2) id0]
+                            [((reference ,id0 ,id1 ,b) ,dots . ,pattern1) id0]
                             [((reference ,id0 ,id1 ,b) . ,pattern1) id0]
                             [(maybe (reference ,id0 ,id1 ,b)) id0]
-                            [((maybe (reference ,id0 ,id1 ,b)) ,dots) id0]
-                            [((maybe (reference ,id0 ,id1 ,b)) ,dots ,pattern1 ... . ,pattern2) id0]
+                            [((maybe (reference ,id0 ,id1 ,b)) ,dots . ,pattern1) id0]
                             [((maybe (reference ,id0 ,id1 ,b)) . ,pattern1) id0]
                             [else (construct-id #'* "anonymous")])]
                [base-name (unique-name lang-name nt-name prod-name)])
@@ -668,13 +654,6 @@
             (with-output-language (Lannotated Production)
               `(production ,pattern ,pretty ,rtd ,tag ,pred ,maker ,field* ...))))))
       (define (build-accessor record-name id) (construct-id #'* record-name id))
-      (define (Pattern* pattern* record-name level flds fns)
-        (let f ([pattern* pattern*])
-          (if (null? pattern*)
-              (values '() flds fns)
-              (let*-values ([(p* flds fns) (f (cdr pattern*))]
-                            [(p flds fns) (Pattern (car pattern*) record-name level flds fns)])
-                (values (cons p p*) flds fns)))))
       (with-output-language (Lannotated PrettyProduction)
         (define (pretty-pattern pattern)
           `(pretty ,(RewritePattern pattern)))
@@ -778,14 +757,10 @@
                `(optional ,ref ,level ,(build-accessor record-name meta-var)))
              flds)
            (cons meta-var fns)))]
-      [(,pattern ,dots)
-       (let-values ([(pattern flds fns) (Pattern pattern record-name (fx+ level 1) flds fns)])
-         (values `(,pattern ,dots) flds fns))]
-      [(,pattern0 ,dots ,pattern1 ... . ,pattern2)
-       (let*-values ([(pattern2 flds fns) (Pattern pattern2 record-name level flds fns)]
-                     [(pattern1 flds fns) (Pattern* pattern1 record-name level flds fns)]
+      [(,pattern0 ,dots . ,pattern1)
+       (let*-values ([(pattern1 flds fns) (Pattern pattern1 record-name level flds fns)]
                      [(pattern0 flds fns) (Pattern pattern0 record-name (fx+ level 1) flds fns)])
-         (values `(,pattern0 ,dots ,pattern1 ... . ,pattern2) flds fns))]
+         (values `(,pattern0 ,dots . ,pattern1) flds fns))]
       [(,pattern0 . ,pattern1)
        (let*-values ([(pattern1 flds fns) (Pattern pattern1 record-name level flds fns)]
                      [(pattern0 flds fns) (Pattern pattern0 record-name level flds fns)])
@@ -861,9 +836,8 @@
       [,ref (Reference ref)]
       [,null #'()]
       [(maybe ,[id]) #`(maybe #,id)]
-      [(,[pattern] ,dots) #`(#,pattern (... ...))]
-      [(,[pattern0] ,dots ,[pattern1] ... . ,[pattern2])
-       #`(#,pattern0 (... ...) #,@pattern1 . #,pattern2)]
+      [(,[pattern0] ,dots . ,[pattern1])
+       #`(#,pattern0 (... ...) . #,pattern1)]
       [(,[pattern0] . ,[pattern1]) #`(#,pattern0 . #,pattern1)])
     (Reference : Reference (ir) -> * (id)
       [(reference ,id0 ,id1 ,b) id0])
@@ -1030,16 +1004,11 @@
        (nanopass-case (Llanguage Pattern) pattern1
          [(maybe ,ref1) (Reference=? ref0 ref1)]
          [else #f])]
-      [(,pattern0 ,dots)
+      [(,pattern00 ,dots . ,pattern10)
        (nanopass-case (Llanguage Pattern) pattern1
-         [(,pattern1 ,dots) (Pattern=? pattern0 pattern1)]
-         [else #f])]
-      [(,pattern00 ,dots ,pattern10 ... . ,pattern20)
-       (nanopass-case (Llanguage Pattern) pattern1
-         [(,pattern01 ,dots ,pattern11 ... . ,pattern21)
+         [(,pattern01 ,dots . ,pattern11)
           (and (Pattern=? pattern00 pattern01)
-               (for-all Pattern=? pattern10 pattern11)
-               (Pattern=? pattern20 pattern21))]
+               (Pattern=? pattern10 pattern11))]
          [else #f])]
       [(,pattern00 . ,pattern10)
        (nanopass-case (Llanguage Pattern) pattern1
@@ -1072,9 +1041,8 @@
       [,ref (RewriteReference ref)]
       [,null #'()]
       [(maybe ,[id]) #`(maybe #,id)]
-      [(,[stx] ,dots) #`(#,stx (... ...))]
-      [(,[stx0] ,dots ,[stx1] ... . ,[stx2])
-       #`(#,stx0 (... ...) #,@stx1 . #,stx2)]
+      [(,[stx0] ,dots . ,[stx1])
+       #`(#,stx0 (... ...) . #,stx1)]
       [(,[stx0] . ,[stx1]) #`(#,stx0 . #,stx1)])
     (RewriteReference : Reference (ir) -> * (stx)
       [(reference ,id0 ,id1 ,b) id0])
@@ -1102,10 +1070,8 @@
       [,ref #`,#,(Reference ref)]
       [,null #'()]
       [(maybe ,[id]) #`,#,id]
-      [(,[pattern] ,dots)
-       #`(#,pattern (... ...))]
-      [(,[pattern0] ,dots ,[pattern1] ... . ,[pattern2])
-       #`(#,pattern0 (... ...) #,@pattern1 . #,pattern2)]
+      [(,[pattern0] ,dots . ,[pattern1])
+       #`(#,pattern0 (... ...) . #,pattern1)]
       [(,[pattern0] . ,[pattern1])
        #`(#,pattern0 . #,pattern1)])
     (Field : Field (ir) -> * (stx)
@@ -1203,9 +1169,8 @@
       [,ref (let-values ([(mv up) (Reference ref)]) #`,#,mv)]
       [,null #'()]
       [(maybe ,[mv up]) #`,#,mv]
-      [(,[pattern] ,dots) #`(#,pattern (... ...))]
-      [(,[pattern0] ,dots ,[pattern1] ... .  ,[pattern2])
-       #`(#,pattern0 (... ...) #,@pattern1 . #,pattern2)]
+      [(,[pattern0] ,dots .  ,[pattern1])
+       #`(#,pattern0 (... ...) . #,pattern1)]
       [(,[pattern0] . ,[pattern1]) #`(#,pattern0 . #,pattern1)])
     (PrettyProduction : PrettyProduction (ir raw-pattern mv*) -> * (stx)
       [(procedure ,handler)
@@ -1238,21 +1203,14 @@
   (define-pass build-parser : Lannotated (ir name) -> * (stx)
     (definitions
       (define-pass extract-bindings : (Lannotated Pattern) (ir) -> * (id*)
-        (definitions
-          (define (Pattern* pattern* id*)
-            (let f ([pattern* pattern*])
-              (if (null? pattern*)
-                  id*
-                  (Pattern (car pattern*) (f (cdr pattern*)))))))
         (Pattern : Pattern (ir id*) -> * (id*)
           [,id id*]
           [,ref (Reference ref id*)]
           [(maybe ,[id*]) id*]
           [,null id*]
-          [(,[id*] ,dots) id*]
           [(,pattern0 . ,[id*]) (Pattern pattern0 id*)]
-          [(,pattern0 ,dots ,pattern1 ... . ,[id*])
-           (Pattern pattern0 (Pattern* pattern1 id*))])
+          [(,pattern0 ,dots . ,[id*])
+           (Pattern pattern0 id*)])
         (Reference : Reference (ir id*) -> * (id*)
           [(reference ,id0 ,id1 ,b) (cons id0 id*)])
         (Pattern ir '()))
@@ -1262,16 +1220,7 @@
               #'fk
               (with-syntax ([(fk) (generate-temporaries '(fk))])
                 (Production (car prod*) id #'fk
-                  #`(lambda () #,(f (cdr prod*))))))))
-      (define (Pattern* pattern* pattern sexp-id body fk)
-        (let f ([pattern* pattern*] [sexp-id sexp-id])
-          (if (null? pattern*)
-              (Pattern pattern sexp-id body fk)
-              (with-syntax ([(a d) (generate-temporaries '(a d))])
-                #`(if (pair? #,sexp-id)
-                      (let ([a (car #,sexp-id)] [d (cdr #,sexp-id)])
-                        #,(Pattern (car pattern*) #'a (f (cdr pattern*) #'d) #'fk))
-                      (#,fk)))))))
+                  #`(lambda () #,(f (cdr prod*)))))))))
     (Defn : Defn (ir) -> * (stx)
       [(define-language ,id ,[mv pname pred term?] ,id? ,rtd ,rcd ,tag-mask (,term* ...) ,[p* n*] ...)
        (with-syntax ([(p* ...) p*]
@@ -1316,20 +1265,6 @@
                  (let ([#,mv #,sexp-id]) #,body)
                  (#,fk))
            #`(let ([#,mv (and #,sexp-id (#,p #,sexp-id #,fk))]) #,body))]
-      [(,pattern ,dots)
-       (let ([binding* (extract-bindings pattern)])
-         (with-syntax ([(t0 t1 loop) (generate-temporaries '(t0 t1 loop))]
-                       [(tbinding ...) (generate-temporaries binding*)]
-                       [(binding ...) binding*])
-           #`(let loop ([t0 #,sexp-id] [tbinding '()] ...)
-               (cond
-                 [(pair? t0)
-                  (let ([t1 (car t0)] [t0 (cdr t0)])
-                    #,(Pattern pattern #'t1 #'(loop t0 (cons binding tbinding) ...) fk))]
-                 [(null? t0)
-                  (let ([binding (reverse tbinding)] ...)
-                    #,body)]
-                 [else (#,fk)]))))]
       [(,pattern0 . ,pattern1)
        (with-syntax ([(a d) (generate-temporaries '(a d))])
          #`(if (pair? #,sexp-id)
@@ -1338,7 +1273,7 @@
                      (Pattern pattern1 #'d body fk)
                      fk))
                (#,fk)))]
-      [(,pattern0 ,dots ,pattern1 ... . ,pattern2)
+      [(,pattern0 ,dots . ,pattern1)
        (let ([binding* (extract-bindings pattern0)])
          (with-syntax ([(binding ...) binding*]
                        [(tbinding ...) (generate-temporaries binding*)]
@@ -1351,7 +1286,7 @@
                                          #'(loop t0 (cons binding tbinding) ...)
                                          fk))
                                    (#,fk)))])
-                 #,(Pattern* pattern1 pattern2 #'t0
+                 #,(Pattern pattern1 #'t0
                      #`(let ([binding (reverse tbinding)] ...)
                          #,body)
                      #'new-fk)))))])
@@ -1360,9 +1295,8 @@
       [,ref (let-values ([(mv up pred term?) (Reference ref)]) #`,#,mv)]
       [,null #'()]
       [(maybe ,[mv up pred term?]) #`,#,mv]
-      [(,[pattern] ,dots) #`(#,pattern (... ...))]
-      [(,[pattern0] ,dots ,[pattern1] ... .  ,[pattern2])
-       #`(#,pattern0 (... ...) #,@pattern1 . #,pattern2)]
+      [(,[pattern0] ,dots . ,[pattern1])
+       #`(#,pattern0 (... ...) . #,pattern1)]
       [(,[pattern0] . ,[pattern1]) #`(#,pattern0 . #,pattern1)]) 
     (Reference : Reference (ir) -> * (mv pname pred term?)
       [(reference ,id0 ,id1 ,b)
@@ -1430,8 +1364,7 @@
     (Pattern (pattern)
       id
       (binding hole)
-      (pattern dots)
-      (pattern0 dots pattern1 ... . pattern2)
+      (pattern0 dots . pattern1)
       (pattern0 . pattern1)
       null)
     (Hole (hole)
@@ -1569,10 +1502,9 @@
       (syntax-case stx ()
         [id (identifier? #'id) #'id]
         [(unq hole) (eq? (datum unq) 'unquote) `(binding ,(Hole #'hole))]
-        [(pattern dots) (eq? (datum dots) '...) `(,(Pattern #'pattern) ,#'dots)]
-        [(pattern0 dots pattern1 ... . pattern2)
+        [(pattern0 dots . pattern1)
          (eq? (datum dots) '...)
-         `(,(Pattern #'pattern0) ,#'dots ,(map Pattern #'(pattern1 ...)) . ,(Pattern #'pattern2))]
+         `(,(Pattern #'pattern0) ,#'dots . ,(Pattern #'pattern1))]
         [(pattern0 . pattern1) `(,(Pattern #'pattern0) . ,(Pattern #'pattern1))]
         [null '()]))
     (Hole : * (stx) -> Hole ()
