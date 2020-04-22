@@ -17,7 +17,7 @@
       optimize-level enumerate with-output-to-string errorf))
 
 
-  (trace-define-syntax define-language-exp
+  (define-syntax define-language-exp
     (lambda (x)
       (lambda (rho)
         (syntax-case x ()
@@ -59,7 +59,7 @@
               (write name)
               (begin (display "list of ") (loop! (fx- level 1))))))))
 
-  (trace-define-syntax define-language-records
+  (define-syntax define-language-records
     (lambda (x)
       (define-pass construct-records : Lannotated (ir) -> * (stx)
         (definitions
@@ -273,7 +273,7 @@
                                    (language-information-language lang1))])
                #'(quote diff))))])))
 
-  (trace-define-syntax define-language-node-counter-exp
+  (define-syntax define-language-node-counter-exp
     (lambda (x)
       (syntax-case x ()
         [(_ name lang)
@@ -281,7 +281,7 @@
            (let ([l (lookup-language rho #'lang)])
              (build-lang-node-counter (language-information-annotated-language l) #'name)))])))
 
-  (trace-define-syntax define-unparser-exp
+  (define-syntax define-unparser-exp
     (lambda (x)
       (syntax-case x ()
         [(_ name lang)
@@ -289,7 +289,7 @@
            (let ([l (lookup-language rho #'lang)])
              (build-unparser (language-information-annotated-language l) #'name)))])))
 
-  (trace-define-syntax define-parser-exp
+  (define-syntax define-parser-exp
     (lambda (x)
       (syntax-case x ()
         [(_ name lang)

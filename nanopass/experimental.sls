@@ -40,8 +40,8 @@
 
   (define-language Lnp-source
     (terminals
-      (syntax (stx))
-      (identifier (id))
+      (syntax (stx))    => syntax->datum
+      (identifier (id)) => syntax->datum
       (datum (handler))
       (dots (dots))
       (null (null)))
@@ -169,14 +169,23 @@
                [() prod*]
                [_ (let-values ([(prod stx) (FinishProd stx)])
                     (cons prod (f stx)))]))]))
-      (define (lookup-language rho base-lang-id)
-        (let ([lang-info (rho base-lang-id)])
-          (unless lang-info (errorf who "could not find language ~s" (syntax->datum base-lang-id)))
-          (language-information-annotated-language lang-info)))
       (define (extend-clauses cl* base-lang)
         (nanopass-case (Lannotated Defn) base-lang
           [(define-language ,id ,ref ,id? ,rtd ,rcd ,tag-mask (,term* ...) ,nt* ...)
-           (fold-right (lambda (cl cl*) (ExtendClause cl term* nt* cl*)) '() cl*)]))
+           (let loop ([cl* cl*] [term* term*] [nt* nt*] [new-term* '()] [new-cl* '()])
+             (if (null? cl*)
+                 (cons
+                   (with-output-language (Lcomplete Clause)
+                     `(terminals
+                        ,(fold-left
+                           (lambda (new-term* term)
+                             (cons (rewrite-annotated-term term) new-term*))
+                           new-term* term*)
+                        ...))
+                   (fold-left (lambda (new-cl* nt) (cons (rewrite-annotated-nt nt) new-cl*)) new-cl* nt*))
+                 (let-values ([(term* nt* new-cl* new-term*)
+                               (ExtendClause (car cl*) term* nt* new-cl* new-term*)])
+                   (loop (cdr cl*) term* nt* new-term* new-cl*))))]))
       (define-pass rewrite-annotated-term : (Lannotated Terminal) (ir) -> (Lcomplete Terminal) ()
         (Terminal : Terminal (ir) -> Terminal ()
           [(,id (,id* ...) ,b ,handler? ,pred)
@@ -210,14 +219,16 @@
            `(,pattern0 ,dots ,pattern1 ... . ,pattern2)]
           [(,[pattern0] . ,[pattern1]) `(,pattern0 . ,pattern1)]
           [,null null]))
-      (define (extend-terminals term* old-term*)
-        (let loop ([term* term*] [old-term* old-term*] [new-term* '()])
+      (define-pass rewrite-annotated-nt : (Lannotated Nonterminal) (ir) -> (Lcomplete Clause) ()
+        (Nonterminal : Nonterminal (ir) -> Clause ()
+          [(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
+           `(,id (,id* ...) ,(map rewrite-production prod*) ...)]))
+      (define (extend-terminals term* old-term* new-term*)
+        (let loop ([term* term*] [old-term* old-term*] [new-term* new-term*])
           (if (null? term*)
-              (fold-left
-                (lambda (term* old-term)
-                  (cons (rewrite-annotated-term old-term) term*))
-                new-term* old-term*)
-              (let-values ([(new-term* old-term*) (ExtendTerminal (car term*) new-term* old-term*)])
+              (values old-term* new-term*)
+              (let-values ([(new-term* old-term*)
+                            (ExtendTerminal (car term*) new-term* old-term*)])
                 (loop (cdr term*) old-term* new-term*)))))
       (define (extend-productions stx* old-prod*)
         (with-values
@@ -287,21 +298,26 @@
                     old-prod*
                     (cons old-prod (f old-prod*)))))))
       (define (find-matching-nt id old-nt*)
-        (let loop ([old-nt* old-nt*])
+        (let f ([old-nt* old-nt*])
           (if (null? old-nt*)
-              '()
-              (nanopass-case (Lannotated Nonterminal) (car old-nt*)
-                [(,id0 (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
-                 (if (eq? (syntax->datum id0) (syntax->datum id))
-                     prod*
-                     (loop (cdr old-nt*)))]))))
+              (values '() '())
+              (let ([old-nt (car old-nt*)] [old-nt* (cdr old-nt*)])
+                (nanopass-case (Lannotated Nonterminal) old-nt
+                  [(,id0 (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
+                   (if (eq? (syntax->datum id0) (syntax->datum id))
+                       (values old-nt* prod*)
+                       (let-values ([(old-nt* prod*) (f old-nt*)])
+                         (values (cons old-nt old-nt*) prod*)))])))))
       )
     (Defn : Defn (def) -> Defn ()
       [(define-language ,id ,cl* ...)
        `(define-language ,id 
           ,(cond
              [(language-extension? cl*) =>
-              (lambda (base-lang-id) (extend-clauses cl* (lookup-language rho base-lang-id)))]
+              (lambda (base-lang-id)
+                (extend-clauses cl*
+                  (language-information-annotated-language
+                    (lookup-language rho base-lang-id))))]
              [else (map FinishClause cl*)])
           ...)])
     (FinishClause : Clause (cl) -> Clause ()
@@ -313,41 +329,42 @@
       [(- ,base-term* ...) (errorf who "unexpected terminal extension clause ~s" (unparse-Lnp-source term))])
     (FinishProd : syntax (stx) -> Production (stx)
       (syntax-case stx ()
-        [(?pattern => ?handler . ?rest)
+        [(?pattern => ?pretty . ?rest)
          (double-arrow? #'=>)
-         (values `(=> ,(Pattern #'?pattern) ,#'?handler) #'?rest)]
+         (values `(=> ,(Pattern #'?pattern) ,(Pattern #'?pretty)) #'?rest)]
         [((=> ?pattern ?handler) . ?rest)
          (double-arrow? #'=>)
-         (values `(=> ,(Pattern #'?pattern) ,#'?handler) #'?rest)]
-        [(?pattern -> ?pretty . ?rest)
+         (values `(=> ,(Pattern #'?pattern) ,(Pattern #'?pretty)) #'?rest)]
+        [(?pattern -> ?handler . ?rest)
          (arrow? #'->)
-         (values `(-> ,(Pattern #'?pattern) ,(Pattern #'?pretty)) #'?rest)]
-        [((-> ?pattern ?pretty) . ?rest)
+         (values `(-> ,(Pattern #'?pattern) ,#'?handler) #'?rest)]
+        [((-> ?pattern ?handler) . ?rest)
          (arrow? #'->)
-         (values `(-> ,(Pattern #'?pattern) ,(Pattern #'?pretty)) #'?rest)]
+         (values `(-> ,(Pattern #'?pattern) ,#'?handler) #'?rest)]
         [(?x . ?rest) (values (Pattern #'?x) #'?rest)]
         [_ (syntax-violation who "unrecognized productions list" stx)]))
-    (ExtendClause : Clause (cl old-term* old-nt* cl*) -> * (cl*)
+    (ExtendClause : Clause (cl old-term* old-nt* cl* new-term*) -> * (old-term* old-nt* cl* new-term*)
       [(terminals ,term* ...)
-       (cons
-         (in-context Clause
-           `(terminals ,(extend-terminals term* old-term*)))
-         cl*)]
+       (let-values ([(old-term* new-term*) (extend-terminals term* old-term* new-term*)])
+         (values old-term* old-nt* cl* new-term*))]
       [(,id (,id* ...) ,prod ,prod* ...)
-       (let ([prod* (extend-productions (cons prod prod*) (find-matching-nt id old-nt*))])
-         (if (null? prod*)
-             cl*
-             (cons
-               (in-context Clause
-                 `(,id (,id* ...) ,prod* ...))
-               cl*)))]
-      [(extends ,id) cl*]
-      [(entry ,id) (cons (in-context Clause `(entry ,id)) cl*)]
+       (let-values ([(old-nt* old-prod*) (find-matching-nt id old-nt*)])
+         (let ([prod* (extend-productions (cons prod prod*) old-prod*)])
+           (values old-term* old-nt* 
+             (if (null? prod*)
+                 cl*
+                 (cons
+                   (in-context Clause
+                     `(,id (,id* ...) ,prod* ...))
+                   cl*))
+             new-term*)))]
+      [(extends ,id) (values old-term* old-nt* cl* new-term*)]
+      [(entry ,id) (values old-term* old-nt* (cons (in-context Clause `(entry ,id)) cl*) new-term*)]
       [(nongenerative-id ,id)
-       (cons (in-context Clause `(nongenerative-id ,id)) cl*)])
+       (values old-term* old-nt* (cons (in-context Clause `(nongenerative-id ,id)) cl*) new-term*)])
     (ExtendTerminal : Terminal (term new-term* old-term*) -> * (new-term* old-term*)
-      [(+ ,base-term* ...)
-       (values (append base-term* new-term*) old-term*)]
+      [(+ ,[term*] ...)
+       (values (append term* new-term*) old-term*)]
       [(- ,base-term* ...)
        (values
          new-term*
@@ -359,6 +376,7 @@
       [(,id (,id* ...)) (remove-terminal id id* old-term*)]
       [(=> (,id (,id* ...)) ,handler) (remove-terminal id id* old-term*)]
       [else (errorf who "unexpected base terminal ~s" (unparse-Lnp-source ir))])
+    (BaseTerminal : BaseTerminal (ir) -> Terminal ())
     (ExtendProd : syntax (stx new-prod* old-prod*) -> * (new-prod* old-prod*)
       (syntax-case stx ()
         [(+ ?prod* ...)
@@ -404,7 +422,7 @@
       (+ (entry ref)
          (id (id* ...) b prod* ...)))
     (Reference (ref)
-      (+ (reference id0 id1 b)))
+      (+ (reference id0 id1 b) => id0))
     (SimpleTerminal (simple-term)
       (- (id (id* ...)))
       (+ (id (id* ...) b)))
@@ -573,7 +591,7 @@
          (terminals term* ...)
          (id (id* ...) b prod* ...)))
     (Nonterminal (nt)
-      (+ (id (id* ...) b rtd rcd tag pred all-pred all-term-pred prod* ...)))
+      (+ (id (id* ...) b rtd rcd tag pred all-pred all-term-pred prod* ...) => (id (id* ...) prod* ...)))
     (PrettyProduction (pretty-prod)
       (+ (procedure handler)
          (pretty pattern)))
@@ -593,7 +611,7 @@
       (- simple-term
          (=> (=> simple-term handler)
              (=> simple-term handler)))
-      (+ (id (id* ...) b (maybe handler) pred)))
+      (+ (id (id* ...) b (maybe handler) pred) => (id (id* ...) handler pred)))
     (SimpleTerminal (simple-term)
       (- (id (id* ...) b))))
 
