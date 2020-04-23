@@ -208,7 +208,8 @@
            (finish-prod pattern pretty-prod?)]
           [else (errorf who "unexpected Production ~s" (unparse-Lannotated ir))])
         (Reference : Reference (ir) -> Pattern ()
-          [(reference ,id0 ,id1 ,b) id0])
+          [(term-ref ,id0 ,id1 ,b) id0]
+          [(nt-ref ,id0 ,id1 ,b) id0])
         (Pattern : Pattern (ir) -> Pattern ()
           [,id id]
           [,ref (Reference ref)]
@@ -256,16 +257,19 @@
                        old-term*
                        (cons old-term (f old-term*)))])))))
       (define-pass syntax-matches? : (Lannotated Production) (pat stx) -> * (boolean?)
+         (definitions
+           (define (identifier-matches? id stx)
+             (and (identifier? stx)
+                  (eq? (syntax->datum id) (syntax->datum stx)))))
         (Production : Production (ir stx) -> * (boolean?)
           [(production ,[b?] ,pretty-prod? ,rtd ,tag ,pred ,maker ,field* ...) b?]
           [(terminal ,[b?] ,pretty-prod?) b?]
           [(nonterminal ,[b?] ,pretty-prod?) b?])
         (Reference : Reference (ir stx) -> * (boolean?)
-          [(reference ,id0 ,id1 ,b)
-           (and (identifier? stx)
-                (eq? (syntax->datum id0) (syntax->datum stx)))])
+          [(term-ref ,id0 ,id1 ,b) (identifier-matches? id0 stx)]
+          [(nt-ref ,id0 ,id1 ,b) (identifier-matches? id0 stx)])
         (Pattern : Pattern (pat stx) -> * (boolean?)
-          [,id (and (identifier? stx) (eq? (syntax->datum id) (syntax->datum stx)))]
+          [,id (identifier-matches? id stx)]
           [,ref (Reference ref stx)]
           [(maybe ,[b?]) b?]
           [(,pattern0 ,dots . ,pattern1)
@@ -412,7 +416,8 @@
       (+ (entry ref)
          (id (id* ...) b prod* ...)))
     (Reference (ref)
-      (+ (reference id0 id1 b) => id0))
+      (+ (term-ref id0 id1 b) => id0
+         (nt-ref id0 id1 b) => id0))
     (SimpleTerminal (simple-term)
       (- (id (id* ...)))
       (+ (id (id* ...) b)))
@@ -479,9 +484,11 @@
             (with-output-language (Llanguage Clause)
               (cons `(terminals ,term* ...) nt*))
             cl*)))
-      (define (build-ref mv id b)
+      (define (build-ref terminal? mv id b)
         (with-output-language (Llanguage Reference)
-          `(reference ,mv ,id ,b)))
+          (if terminal?
+              `(term-ref ,mv ,id ,b)
+              `(nt-ref ,mv ,id ,b))))
       (define ref
         (case-lambda
           [(ht id)
@@ -492,14 +499,17 @@
                    b)))]
           [(pt ht id)
            (let* ([str (symbol->string (syntax->datum id))]
-                  [raw-id (match-prefix pt str (meta-variable-suffix-checker))])
+                  [pr (match-prefix pt str (meta-variable-suffix-checker))]
+                  [terminal? (car pr)]
+                  [raw-id (cdr pr)])
              (unless raw-id (syntax-violation who "unable to find matching metavariable" id))
-             (build-ref id raw-id (ref ht raw-id)))]))
+             (build-ref terminal? id raw-id (ref ht raw-id)))]))
       (define (maybe-ref pt ht id)
         (let* ([str (symbol->string (syntax->datum id))]
-               [raw-id (match-prefix pt str (meta-variable-suffix-checker))])
-          (if raw-id
-              (build-ref id raw-id (ref ht raw-id))
+               [pr (match-prefix pt str (meta-variable-suffix-checker))])
+          (if pr
+              (let ([terminal? (car pr)] [raw-id (cdr pr)])
+                (build-ref terminal? id raw-id (ref ht raw-id)))
               id))))
     (Defn : Defn (ir) -> Defn ()
       [(define-language ,id ,cl* ...)
@@ -511,7 +521,8 @@
       [(,id (,id* ...) ,prod* ...)
        ;; should we be using an identifier hashtable? or symbol hashtable?
        (eq-hashtable-set! ht (syntax->datum id) (box #f))
-       (fold-left (lambda (pt mv-id) (insert-prefix pt (symbol->string (syntax->datum mv-id)) id)) pt id*)]
+       (let ([pr (cons #f id)])
+         (fold-left (lambda (pt mv-id) (insert-prefix pt (symbol->string (syntax->datum mv-id)) pr)) pt id*))]
       [else pt])
     (ExtendMapsTerminal : Terminal (term pt ht) -> * (pt)
       [,simple-term (ExtendMapsSimpleTerminal simple-term pt ht)]
@@ -519,7 +530,8 @@
     (ExtendMapsSimpleTerminal : SimpleTerminal (simple-term pt ht) -> * (pt)
       [(,id (,id* ...))
        (eq-hashtable-set! ht (syntax->datum id) (box #f))
-       (fold-left (lambda (pt mv-id) (insert-prefix pt (symbol->string (syntax->datum mv-id)) id)) pt id*)])
+       (let ([pr (cons #t id)])
+         (fold-left (lambda (pt mv-id) (insert-prefix pt (symbol->string (syntax->datum mv-id)) pr)) pt id*))])
     (Terminal : Terminal (term ht) -> Terminal ()
       [(,id (,id* ...))
        (let* ([b (ref ht id)]
@@ -534,7 +546,7 @@
       [,simple-term (errorf who "unreachable match ,simple-term, reached!")]
       [(=> ,simple-term ,handler) (errorf who "unreachable match (=> ,simple-term ,handler), reached!")])
     (Clause : Clause (cl pt ht) -> Clause ()
-      [(entry ,id) `(entry (reference ,id ,id ,(ref ht id)))]
+      [(entry ,id) `(entry (nt-ref ,id ,id ,(ref ht id)))]
       [(nongenerative-id ,id) `(nongenerative-id ,id)]
       [(terminals ,term* ...) (errorf who "unexpected terminal clause after terminals were filtered")]
       [(,id (,id* ...) ,prod* ...)
@@ -609,7 +621,7 @@
     (definitions
       (define-pass build-ref : (Llanguage Clause) (cl) -> (Llanguage Reference) ()
         (build-ref : Clause (cl) -> Reference ()
-          [(,id (,id* ...) ,b ,prod* ...) `(reference ,id ,id ,b)]
+          [(,id (,id* ...) ,b ,prod* ...) `(nt-ref ,id ,id ,b)]
           [else (errorf who "unexpected clause ~s" (unparse-Llanguage cl))]))
       (define (separate-clauses cl*)
         (let loop ([cl* cl*] [entry #f] [first-nt #f] [nongen-id #f] [rterm* '()] [rnt* '()])
@@ -629,16 +641,19 @@
                   (Nonterminal (car nt*) lang-name lang-rtd lang-rcd bits tag nongen-id)
                   (f (cdr nt*) (fx+ tag 1)))))))
       (define (build-production pattern nt-rtd lang-name nt-name tag pretty nongen-id)
-        (let* ([prod-name (nanopass-case (Llanguage Pattern) pattern
-                            [,id id]
-                            [(,id0 ,dots . ,pattern1) id0]
-                            [(,id0 . ,pattern1) id0]
-                            [((reference ,id0 ,id1 ,b) ,dots . ,pattern1) id0]
-                            [((reference ,id0 ,id1 ,b) . ,pattern1) id0]
-                            [(maybe (reference ,id0 ,id1 ,b)) id0]
-                            [((maybe (reference ,id0 ,id1 ,b)) ,dots . ,pattern1) id0]
-                            [((maybe (reference ,id0 ,id1 ,b)) . ,pattern1) id0]
-                            [else (construct-id #'* "anonymous")])]
+        (define-pass find-prod-name : (Llanguage Pattern) (pattern) -> * (id)
+          (Pattern : Pattern (pattern) -> * (id)
+            [,id id]
+            [,ref (Reference ref)]
+            [(maybe ,[id]) id]
+            [(,[id] ,dots . ,pattern1) id]
+            [(,[id] . ,pattern1) id]
+            [else (construct-id #'* "anonymous")])
+          (Reference : Reference (ref) -> * (id)
+            [(term-ref ,id0 ,id1 ,b) id0]
+            [(nt-ref ,id0 ,id1 ,b) id0])
+          (Pattern pattern))
+        (let* ([prod-name (find-prod-name pattern)]
                [base-name (unique-name lang-name nt-name prod-name)])
           (let-values ([(pattern field* field-name*) (Pattern pattern base-name 0 '() '())])
             (let* ([rtd (make-record-type-descriptor (string->symbol base-name) nt-rtd
@@ -730,12 +745,8 @@
       [(=> ,pattern0 ,pattern1) (build-production pattern0 nt-rtd lang-name nt-name prod-tag (pretty-pattern pattern1) nongen-id)]
       [(-> ,pattern ,handler) (build-production pattern nt-rtd lang-name nt-name prod-tag (pretty-procedure handler) nongen-id)])
     (BaseReference : Reference (ref maybe-pretty) -> Production ()
-      [(reference ,id0 ,id1 ,b)
-       (let ([x (unbox b)])
-         (if (or (Llanguage-Terminal? x)
-                 (Lannotated-Terminal? x))
-             `(terminal (reference ,id0 ,id1 ,b) ,maybe-pretty)
-             `(nonterminal (reference ,id0 ,id1 ,b) ,maybe-pretty)))])
+      [(term-ref ,id0 ,id1 ,b) `(terminal (term-ref ,id0 ,id1 ,b) ,maybe-pretty)]
+      [(nt-ref ,id0 ,id1 ,b) `(nonterminal (nt-ref ,id0 ,id1 ,b) ,maybe-pretty)])
     (RewritePattern : Pattern (pattern) -> Pattern ())
     (Pattern : Pattern (pattern record-name level flds fns) -> Pattern (flds fns)
       [,id (values id flds fns)]
@@ -767,7 +778,8 @@
          (values `(,pattern0 . ,pattern1) flds fns))]
       [,null (values null flds fns)])
     (Reference : Reference (ref) -> Reference (id)
-      [(reference ,id0 ,id1 ,b) (values `(reference ,id0 ,id1 ,b) id0)])
+      [(term-ref ,id0 ,id1 ,b) (values `(term-ref ,id0 ,id1 ,b) id0)]
+      [(nt-ref ,id0 ,id1 ,b) (values `(nt-ref ,id0 ,id1 ,b) id0)])
     )
 
   (define-pass prune-lang : Lannotated (ir caller-who maybe-name) -> * (stx)
@@ -783,17 +795,14 @@
                    (terminals #,@ts)
                    #,@nts)))))])
     (FollowReference : Reference (ir ht ts nts) -> * (id ts nts)
-      [(reference ,id0 ,id1 ,b)
-       (let ([ir (unbox b)])
-         (cond
-           [(eq-hashtable-ref ht ir #f) (values id0 ts nts)]
-           [(Lannotated-Terminal? ir)
-            (eq-hashtable-set! ht ir #t)
-            (FollowTerminal ir ts nts id0)]
-           [(Lannotated-Nonterminal? ir)
-            (eq-hashtable-set! ht ir #t)
-            (FollowNonterminal ir ht ts nts id0)]
-           [else (errorf caller-who "unrecognized box contents for ~s" (syntax->datum id0))]))])
+      [(term-ref ,id0 ,id1 ,b)
+       (unless (eq-hashtable-ref ht ir #f)
+         (eq-hashtable-set! ht ir #t)
+         (FollowTerminal (unbox b) ts nts id0))]
+      [(nt-ref ,id0 ,id1 ,b)
+       (unless (eq-hashtable-ref ht ir #f)
+         (eq-hashtable-set! ht ir #t)
+         (FollowNonterminal (unbox b) ht ts nts id0))])
     (FollowTerminal : Terminal (ir ts nts id0) -> * (id0 ts nts)
       [(,id (,id* ...) ,b ,handler? ,pred)
        (values
@@ -840,7 +849,8 @@
        #`(#,pattern0 (... ...) . #,pattern1)]
       [(,[pattern0] . ,[pattern1]) #`(#,pattern0 . #,pattern1)])
     (Reference : Reference (ir) -> * (id)
-      [(reference ,id0 ,id1 ,b) id0])
+      [(term-ref ,id0 ,id1 ,b) id0]
+      [(nt-ref ,id0 ,id1 ,b) id0])
     (Defn ir))
 
   (define-pass diff-langs : Llanguage (ir-out ir-base) -> * (stx)
@@ -1017,9 +1027,15 @@
                (Pattern=? pattern10 pattern11))]
          [else #f])])
     (Reference=? : Reference (ref0 ref1) -> * (bool?)
-      [(reference ,id00 ,id10 ,b0)
+      [(term-ref ,id00 ,id10 ,b0)
        (nanopass-case (Llanguage Pattern) ref1
-         [(reference ,id01 ,id11 ,b1)
+         [(term-ref ,id01 ,id11 ,b1)
+          (eq? (syntax->datum id00)
+               (syntax->datum id01))]
+         [else #f])]
+      [(nt-ref ,id00 ,id10 ,b0)
+       (nanopass-case (Llanguage Pattern) ref1
+         [(nt-ref ,id01 ,id11 ,b1)
           (eq? (syntax->datum id00)
                (syntax->datum id01))]
          [else #f])])
@@ -1045,7 +1061,8 @@
        #`(#,stx0 (... ...) . #,stx1)]
       [(,[stx0] . ,[stx1]) #`(#,stx0 . #,stx1)])
     (RewriteReference : Reference (ir) -> * (stx)
-      [(reference ,id0 ,id1 ,b) id0])
+      [(term-ref ,id0 ,id1 ,b) id0]
+      [(nt-ref ,id0 ,id1 ,b) id0])
     (Defn ir-out ir-base))
 
   (define-pass build-lang-node-counter : Lannotated (ir name) -> * (stx)
@@ -1060,9 +1077,9 @@
     (Production : Production (ir) -> * (stx)
       [(production ,[pattern] ,pretty-prod? ,rtd ,tag ,pred ,maker ,[recur] ...)
        #`[#,pattern (+ 1 . #,recur)]]
-      [(terminal (reference ,id0 ,id1 ,b) ,pretty-prod?)
+      [(terminal (term-ref ,id0 ,id1 ,b) ,pretty-prod?)
        #`[,#,id0 0]]
-      [(nonterminal (reference ,id0 ,id1 ,b) ,pretty-prod?)
+      [(nonterminal (nt-ref ,id0 ,id1 ,b) ,pretty-prod?)
        #`[,#,id0 (#,id1 #,id0)]]
       [else (errorf who "unrecognized production ~s" (unparse-Lannotated ir))])
     (Pattern : Pattern (ir) -> * (stx)
@@ -1083,18 +1100,19 @@
                 #`(lambda (x)
                     (fold-left
                       (lambda (c x) (+ c (#,(f (fx- level 1)) x)))
-                      0 x))))))
-      [((reference ,id0 ,id1 ,b) ,level ,accessor)
-       (if (Lannotated-Terminal? (unbox b))
-           #'0  ;; possibly should be length?
-           #`(#,(build-recur id1 level) #,id0))]
-      [(optional (reference ,id0 ,id1 ,b) ,level ,accessor)
-       (if (Lannotated-Terminal? (unbox b))
-           #'0  ;; possibly should be length?
-           #`(#,(build-recur #`(lambda (x) (if x (#,id1 x) 0)) level) #,id0))]
+                      0 x)))))
+        (define (Ref ref level optional?)
+          (nanopass-case (Lannotated Reference) ref
+            [(term-ref ,id0 ,id1 ,b) #'0] ;; possibly should be 1 at base, with recur to sum
+            [(nt-ref ,id0 ,id1 ,b)
+             (let ([recur-base (if optional?  #`(lambda (x) (if x (#,id1 x) 0)) id1)])
+               #`(#,(build-recur recur-base level) #,id0))])))
+      [(,ref ,level ,accessor) (Ref ref level #f)]
+      [(optional ,ref ,level ,accessor) (Ref ref level #t)]
       [else (errorf who "unrecognized field ~s" (unparse-Lannotated ir))])
     (Reference : Reference (ir) -> * (id)
-      [(reference ,id0 ,id1 ,b) id0])
+      [(term-ref ,id0 ,id1 ,b) id0]
+      [(nt-ref ,id0 ,id1 ,b) id0])
     (Defn ir))
 
   (define-pass build-unparser : Lannotated (ir name) -> * (stx)
@@ -1197,7 +1215,8 @@
            #`(lambda (x) (and x (#,up x)))
            level))])
     (Reference : Reference (ir) -> * (mv up)
-      [(reference ,id0 ,id1 ,b) (values id0 id1)])
+      [(term-ref ,id0 ,id1 ,b) (values id0 id1)]
+      [(nt-ref ,id0 ,id1 ,b) (values id0 id1)])
     (Defn ir))
 
   (define-pass build-parser : Lannotated (ir name) -> * (stx)
@@ -1212,7 +1231,8 @@
           [(,pattern0 ,dots . ,[id*])
            (Pattern pattern0 id*)])
         (Reference : Reference (ir id*) -> * (id*)
-          [(reference ,id0 ,id1 ,b) (cons id0 id*)])
+          [(term-ref ,id0 ,id1 ,b) (cons id0 id*)]
+          [(nt-ref ,id0 ,id1 ,b) (cons id0 id*)])
         (Pattern ir '()))
       (define (build-body id prod*)
         (let f ([prod* prod*])
@@ -1299,14 +1319,12 @@
        #`(#,pattern0 (... ...) . #,pattern1)]
       [(,[pattern0] . ,[pattern1]) #`(#,pattern0 . #,pattern1)]) 
     (Reference : Reference (ir) -> * (mv pname pred term?)
-      [(reference ,id0 ,id1 ,b)
-       (let ([r (unbox b)])
-         (values id0 id1
-           (if (Lannotated-Terminal? r)
-               (nanopass-case (Lannotated Terminal) r
-                 [(,id (,id* ...) ,b ,handler? ,pred) pred])
-               #f)
-           (Lannotated-Terminal? r)))])
+      [(term-ref ,id0 ,id1 ,b)
+       (values id0 id1
+         (nanopass-case (Lannotated Terminal) (unbox b)
+           [(,id (,id* ...) ,b ,handler? ,pred) pred])
+         #t)]
+      [(nt-ref ,id0 ,id1 ,b) (values id0 id1 #f #f)])
     (Defn ir))
 
   (define (star? x)
@@ -1591,21 +1609,6 @@
          cata-out))
     (CatamorphismOutputVariables (cata-out)
       (- (id* ...))))
-
-  #|
-  (define-pass expand-pass : Lpass-src (ir rho caller-who) -> Lpass ()
-    (Defn : Defn (ir) -> Defn ()
-      [(define-pass ,id ,: ,[lang0] (,id* ...) ,-> ,[lang1] (,out* ...)
-         (,options ,opt* ...)
-         (,definitions ,stx* ...)
-         ,proc* ...
-         ,stx?)
-       `(define-pass ,id ,: ,lang0 (,id* ...) ,-> ,lang1 (,out* ...)
-          (,options ,opt* ...)
-          (,definitons ,stx* ...)
-          ,proc* ...
-          ,(or stx? (find-entry-processor 
-  |#
 
   (define lookup-language
     (lambda (rho name)

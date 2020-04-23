@@ -119,17 +119,15 @@
              (build-field-check name mv level
                #`(lambda (x) (or (eq? x #f) (#,pred x)))))])
         (Reference : Reference (ir) -> * (mv name pred)
-          [(reference ,id0 ,id1 ,b)
-           (let-values ([(name pred) (let ([r (unbox b)])
-                                       (if (Lannotated-Terminal? r)
-                                           (TerminalPred r)
-                                           (NonterminalPred r)))])
-             (values id0 name pred))])
+          [(term-ref ,id0 ,id1 ,b)
+           (values id0 id1 (TerminalPred (unbox b)))]
+          [(nt-ref ,id0 ,id1 ,b)
+           (values id0 id1 (NonterminalPred (unbox b)))])
         (TerminalPred : Terminal (ir) -> * (name pred)
-          [(,id (,id* ...) ,b ,handler? ,pred) (values id pred)])
+          [(,id (,id* ...) ,b ,handler? ,pred) pred])
         (NonterminalPred : Nonterminal (ir) -> * (name pred)
           [(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,prod* ...)
-           (values id all-pred)])
+           all-pred])
         (Defn ir))
       (syntax-case x ()
         [(_ name)
@@ -173,10 +171,10 @@
                  (let-values ([(tpred* lang-tpred*) (Production (car prod*) pred* lang-tpred*)])
                    (loop (cdr prod*) tpred* lang-tpred*))))])
         (Production : Production (ir pred* lang-tpred*) -> * (pred* lang-tpred*)
-          [(terminal (reference ,id0 ,id1 ,b) ,pretty-prod?)
+          [(terminal (term-ref ,id0 ,id1 ,b) ,pretty-prod?)
            (let ([pred (TerminalPred (unbox b))])
              (values (cons pred pred*) (set-cons pred lang-tpred*)))]
-          [(nonterminal (reference ,id0 ,id1 ,b) ,pretty-prod?)
+          [(nonterminal (nt-ref ,id0 ,id1 ,b) ,pretty-prod?)
            (values (cons (NonterminalPred (unbox b)) pred*) lang-tpred*)]
           [else (values pred* lang-tpred*)])
         (TerminalPred : Terminal (ir) -> * (pred)
@@ -227,7 +225,8 @@
            `(,pattern0 . ,pattern1)]
           [,null '()])
         (Reference : Reference (ir) -> * (sym)
-          [(reference ,id0 ,id1 ,b) (syntax->datum id0)])
+          [(term-ref ,id0 ,id1 ,b) (syntax->datum id0)]
+          [(nt-ref ,id0 ,id1 ,b) (syntax->datum id0)])
         (Defn ir))
       (syntax-case x ()
         [(_ name)
