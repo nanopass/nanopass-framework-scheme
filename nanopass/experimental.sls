@@ -624,13 +624,13 @@
           [(,id (,id* ...) ,b ,prod* ...) `(nt-ref ,id ,id ,b)]
           [else (errorf who "unexpected clause ~s" (unparse-Llanguage cl))]))
       (define (separate-clauses cl*)
-        (let loop ([cl* cl*] [entry #f] [first-nt #f] [nongen-id #f] [rterm* '()] [rnt* '()])
+        (let loop ([cl* cl*] [entry #f] [first-nt #f] [nongen-id #f] [rterm* '()] [rnt* '()] [rb* '()])
           (if (null? cl*)
-              (values (or entry (build-ref first-nt)) nongen-id (reverse rterm*) (reverse rnt*))
+              (values (or entry (build-ref first-nt)) nongen-id (reverse rterm*) (reverse rnt*) rb*)
               (with-values
-                (BinClause (car cl*) entry first-nt nongen-id rterm* rnt*)
-                (lambda (entry first-nt nongen-id rterm* rnt*)
-                  (loop (cdr cl*) entry first-nt nongen-id rterm* rnt*))))))
+                (BinClause (car cl*) entry first-nt nongen-id rterm* rnt* rb*)
+                (lambda (entry first-nt nongen-id rterm* rnt* rb*)
+                  (loop (cdr cl*) entry first-nt nongen-id rterm* rnt* rb*))))))
       (define (annotate-terminals term*) (map Terminal term*))
       (define (annotate-nonterminals nt* lang-name lang-rtd lang-rcd nongen-id)
         (let ([bits (fxlength (length nt*))])
@@ -677,7 +677,7 @@
       )
     (Defn : Defn (def) -> Defn ()
       [(define-language ,id ,cl* ...)
-       (let-values ([(entry nongen-id term* nt*) (separate-clauses cl*)])
+       (let-values ([(entry nongen-id term* nt* b*) (separate-clauses cl*)])
          (let* ([rtd (make-record-type-descriptor (syntax->datum id)
                        (record-type-descriptor nanopass-record)
                        (if nongen-id (syntax->datum nongen-id) (gensym (unique-name id)))
@@ -688,26 +688,42 @@
                 [term* (annotate-terminals term*)]
                 [nt* (annotate-nonterminals nt* id rtd rcd nongen-id)])
            (let-values ([(ref ref-id) (Reference entry)]) 
+             (for-each (lambda (b) (set-box! b (cdr (unbox b)))) b*)
              `(define-language ,id ,ref ,nongen-id ,rtd ,rcd ,tag-mask (,term* ...) ,nt* ...))))])
-    (BinClause : Clause (cl entry first-nt nongen-id rterm* rnt*) -> * (entry first-nt nongen-id rterm* rnt*)
+    (BinClause : Clause (cl entry first-nt nongen-id rterm* rnt* rb*) -> * (entry first-nt nongen-id rterm* rnt* rb*)
       [(entry ,ref)
        (when entry (errorf who "found more than one entry"))
-       (values ref first-nt nongen-id rterm* rnt*)]
+       (values ref first-nt nongen-id rterm* rnt* rb*)]
       [(nongenerative-id ,id)
        (when nongen-id (syntax-violation who "found more than one nongenerative-id" id))
-       (values entry first-nt id rterm* rnt*)]
+       (values entry first-nt id rterm* rnt* rb*)]
       [(terminals ,term* ...)
-       (values entry first-nt nongen-id (append term* rterm*) rnt*)]
+       (values entry first-nt nongen-id (append term* rterm*) rnt* (fold-right GrabTermBox rb* term*))]
       [(,id (,id* ...) ,b ,prod* ...)
-       (values entry (or first-nt cl) nongen-id rterm* (cons cl rnt*))])
-    (Terminal : Terminal (term ) -> Terminal ()
+       (let ([new-b (box #f)])
+         (set-box! b (cons new-b (unbox b)))
+         (values entry (or first-nt cl) nongen-id rterm* (cons cl rnt*) (cons b rb*)))])
+    (GrabTermBox : Terminal (term rb*) -> * (rb*)
       [(,id (,id* ...) ,b)
-       (let ([term `(,id (,id* ...) ,b #f ,(construct-id id id "?"))])
-         (set-box! b term)
+       (let ([new-b (box #f)])
+         (set-box! b (cons new-b (unbox b)))
+         (cons b rb*))]
+      [(=> (,id (,id* ...) ,b) ,handler)
+       (let ([new-b (box #f)])
+         (set-box! b (cons new-b (unbox b)))
+         (cons b rb*))]
+      ;; unreachable!
+      [else (errorf who "unreachable")])
+    (Terminal : Terminal (term) -> Terminal ()
+      [(,id (,id* ...) ,b)
+       (let* ([new-b (car (unbox b))]
+              [term `(,id (,id* ...) ,new-b #f ,(construct-id id id "?"))])
+         (set-box! new-b term)
          term)]
       [(=> (,id (,id* ...) ,b) ,handler)
-       (let ([term `(,id (,id* ...) ,b ,handler ,(construct-id id id "?"))])
-         (set-box! b term)
+       (let* ([new-b (car (unbox b))]
+              [term `(,id (,id* ...) ,new-b ,handler ,(construct-id id id "?"))])
+         (set-box! new-b term)
          term)]
       [else (errorf who "unexpected terminal ~s" (unparse-Llanguage term))])
     (Nonterminal : Clause (cl lang-name lang-rtd lang-rcd bits tag nongen-id) -> Nonterminal ()
@@ -728,8 +744,9 @@
               [all-term-pred (construct-id #'* lang-name "-" id "-terminal?")])
          (let loop ([prod* prod*] [next 1] [rprod* '()])
            (if (null? prod*)
-               (let ([nt `(,id (,id* ...) ,b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,(reverse rprod*) ...)])
-                 (set-box! b nt)
+               (let* ([new-b (car (unbox b))]
+                      [nt `(,id (,id* ...) ,new-b ,rtd ,rcd ,tag ,pred ,all-pred ,all-term-pred ,(reverse rprod*) ...)])
+                 (set-box! new-b nt)
                  nt)
                (let ([prod-tag (fx+ (fxarithmetic-shift-left next bits) tag)])
                  (loop
@@ -778,8 +795,8 @@
          (values `(,pattern0 . ,pattern1) flds fns))]
       [,null (values null flds fns)])
     (Reference : Reference (ref) -> Reference (id)
-      [(term-ref ,id0 ,id1 ,b) (values `(term-ref ,id0 ,id1 ,b) id0)]
-      [(nt-ref ,id0 ,id1 ,b) (values `(nt-ref ,id0 ,id1 ,b) id0)])
+      [(term-ref ,id0 ,id1 ,b) (values `(term-ref ,id0 ,id1 ,(car (unbox b))) id0)]
+      [(nt-ref ,id0 ,id1 ,b) (values `(nt-ref ,id0 ,id1 ,(car (unbox b))) id0)])
     )
 
   (define-pass prune-lang : Lannotated (ir caller-who maybe-name) -> * (stx)
