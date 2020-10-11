@@ -814,3 +814,9 @@ LATEST
     quoted terminals in patterns, and a little code and comment cleanup.
       nanopass/helpers.ss, nanopass/meta-syntax-dispatch.ss, nanopass/pass.ss,
       nanopass/records.ss
+2020-10-11 -
+  * Changed the nano-syntax-dispatch into a macro so that compilers using
+    define-parser do not have a run-time dependency on the (nanopass
+    nano-syntax-dispatch) library.  With this change the pattern no longer
+    needs to be quoted in the output of define-parser.
+      nanopass/nano-syntax-dispatch.ss, nanopass/parser.ss

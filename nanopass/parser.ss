@@ -105,10 +105,10 @@
                                         [(msg ...) (map (lambda (x) #f) #'(field-var ...))]
                                         [field-pats (datum->syntax #'* (pair-alt-pattern alt))])
                             #`[#,(if (pair-alt-implicit? alt)
-                                     #'(nano-syntax-dispatch s-exp 'field-pats)
+                                     #'(nano-syntax-dispatch s-exp field-pats)
                                      (with-syntax ([key (car (alt-syn alt))])
                                        #'(and (eq? 'key (car s-exp))
-                                              (nano-syntax-dispatch (cdr s-exp) 'field-pats))))
+                                              (nano-syntax-dispatch (cdr s-exp) field-pats))))
                                =>
                                (lambda (ls)
                                  (apply
