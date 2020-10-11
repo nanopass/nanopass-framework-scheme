@@ -39,8 +39,8 @@ matrix:
             - libncurses5-dev
             - libgmp-dev
             - libffi-dev
-     - os: linux
-       env: SCHEME=ironscheme
+    - os: linux
+      env: SCHEME=ironscheme
 #    - os: windows
 #      env: SCHEME=chez
 #      before_script:
