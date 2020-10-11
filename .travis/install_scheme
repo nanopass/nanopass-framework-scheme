@@ -113,7 +113,7 @@ function install_ironscheme {
   retrieve_file $DOTNET_URL $DOTNET_FILE
   chmod +x $DOTNET_FILE
   # install .NET
-  $DOTNET_FILE --channel Current --runtime dotnet
+  "./$DOTNET_FILE" --channel Current --runtime dotnet
   export -p PATH="$HOME/.dotnet:$PATH"
 
   BASE_URL="https://github.com/IronScheme/IronScheme/releases/download"
