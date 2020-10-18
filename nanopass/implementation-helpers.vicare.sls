@@ -48,9 +48,6 @@
     ;; the base record, so that we can use gensym syntax
     define-nanopass-record
 
-    ;; failure token so that we can know when parsing fails with a gensym
-    np-parse-fail-token
-
     ;; handy syntactic stuff
     with-implicit
 
@@ -84,9 +81,6 @@
                    (nongenerative #{nanopass-record d47f8omgluol6otrw1yvu5-0})
                    (fields (immutable tag nanopass-record-tag))))])))
  
-  ;; another gensym listed into this library
-  (define np-parse-fail-token '#{np-parse-fail-token dlkcd4b37swscag1dvmuiz-13})
-
   (define-syntax eq-hashtable-set! (identifier-syntax hashtable-set!))
   (define-syntax eq-hashtable-ref (identifier-syntax hashtable-ref))
 

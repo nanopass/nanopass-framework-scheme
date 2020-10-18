@@ -820,3 +820,13 @@ LATEST
     nano-syntax-dispatch) library.  With this change the pattern no longer
     needs to be quoted in the output of define-parser.
       nanopass/nano-syntax-dispatch.ss, nanopass/parser.ss
+2020-10-18 -
+  * Removed np-parse-fail-token as a run-time dependency by making it a macro.
+    The whole parser really needs to be revisited, but this should make it
+    possible to generate compilers with intermediate language parser that do
+    not have a run-time dependency on the nanopass framework.
+      nanopass/parser.ss, nanopass/helpers.ss,
+      nanopass/implementation-helpers.chezscheme.sls,
+      nanopass/implementation-helpers.ikarus.ss,
+      nanopass/implementation-helpers.ironscheme.sls,
+      nanopass/implementation-helpers.vicare.sls

@@ -58,9 +58,6 @@
     ;; the base record, so that we can use gensym syntax
     define-nanopass-record
 
-    ;; failure token so that we can know when parsing fails with a gensym
-    np-parse-fail-token
-
     ;; handy syntactic stuff
     with-implicit with-r6rs-quasiquote with-extended-quasiquote
     extended-quasiquote with-auto-unquote
