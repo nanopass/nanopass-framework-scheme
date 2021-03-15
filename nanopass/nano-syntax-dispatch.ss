@@ -2,98 +2,110 @@
 ;;; See the accompanying file Copyright for details
 
 (library (nanopass nano-syntax-dispatch)
-  (export nano-syntax-dispatch)
+  (export nano-syntax-dispatch any each each+ each-any)
   (import (rnrs) (nanopass helpers))
 
-  (define-syntax match-each
-    (syntax-rules ()
-      [(_ ?e p)
-       (let f ([e ?e])
-         (cond
-           [(pair? e) (match (car e) p (f (cdr e)))]
-           [(null? e) '()]
-           [else #f]))]))
-
-  (define-syntax match-remainder
-    (syntax-rules ()
-      [(_ ?e () z-pat ?r)
-       (let loop ([e ?e] [re* '()])
-         (if (pair? e)
-             (loop (cdr e) (cons (car e) re*))
-             (values re* (match e z-pat ?r))))]
-      [(_ ?e (y-pat . y-pat-rest) z-pat ?r)
-       (let-values ([(re* r) (match-remainder ?e y-pat-rest z-pat ?r)])
-         (if r
-             (if (null? re*)
-                 (values #f #f)
-                 (values (cdr re*) (match (car re*) y-pat r)))
-             (values #f #f)))]))
-
-  (define-syntax match-each+
-    (syntax-rules ()
-      [(_ e x-pat y-pat z-pat ?r)
-       (let-values ([(re* r) (match-remainder e y-pat z-pat ?r)])
-         (if r
-             (let loop ([re* re*] [xr* '()])
-               (if (null? re*)
-                   (values xr* r)
-                   (let ([xr (match (car re*) x-pat '())])
-                     (if xr
-                         (loop (cdr re*) (cons xr xr*))
-                         (values #f #f)))))
-             (values #f #f)))]))
-
-  (define-syntax match-each-any
-    (syntax-rules ()
-      [(_ ?e)
-       (let f ([e ?e])
-         (cond
-           [(pair? e)
-            (let ([l (f (cdr e))])
-              (and l (cons (car e) l)))]
-           [(null? e) '()]
-           [else #f]))]))
-
-  (define-syntax match-empty
-    (lambda (x)
-      (syntax-case x (any each-any each each+)
-        [(_ () r) #'r]
-        [(_ any r) #'(cons '() r)]
-        [(_ (a . d) r) #'(match-empty a (match-empty d r))]
-        [(_ each-any r) #'(cons '() r)]
-        [(_ #(each p1) r) #'(match-empty p1 r)]
-        [(_ #(each+ p1 (p2 ...) p3) r)
-         (with-syntax ([(rp2 ...) (reverse #'(p2 ...))])
-           #'(match-empty p1 (match-empty (rp2 ...) (match-empty p3 r))))])))
-
-  (define-syntax match
-    (syntax-rules (any)
-      [(_ e any r) (and r (cons e r))]
-      [(_ e p r) (and r (match* e p r))]))
-
-  (define-syntax match*
-    (syntax-rules (any each-any each each+)
-      [(_ e () r) (and (null? e) r)]
-      [(_ e (a . d) r) (and (pair? e) (match (car e) a (match (cdr e) d r)))]
-      [(_ e each-any r) (let ([l (match-each-any e)]) (and l (cons l r)))]
-      [(_ e #(each p1) ?r)
-       (if (null? e)
-           (match-empty p1 ?r)
-           (let ([r* (match-each e p1)])
-             (and r* (let combine ([r* r*] [r ?r])
-                       (if (null? (car r*))
-                           r
-                           (cons (map car r*) (combine (map cdr r*) r)))))))]
-      [(_ e #(each+ p1 p2 p3) ?r)
-       (let-values ([(xr* r) (match-each+ e p1 p2 p3 ?r)])
-         (and r (if (null? xr*)
-                    (match-empty p1 r)
-                    (let combine ([r* xr*] [r r])
-                      (if (null? (car r*))
-                          r
-                          (cons (map car r*) (combine (map cdr r*) r)))))))]))
+  (define-syntax any (lambda (x) #f))
+  (define-syntax each (lambda (x) #f))
+  (define-syntax each+ (lambda (x) #f))
+  (define-syntax each-any (lambda (x) #f))
 
   (define-syntax nano-syntax-dispatch
-    (syntax-rules (any)
-      [(_ e any) (list e)]
-      [(_ e p) (match* e p '())])))
+    (lambda (x)
+      (define combiner
+        (lambda ()
+          #'(lambda (r* r)
+              (let f ([r* r*])
+                (if (null? (car r*))
+                    r
+                    (cons (map car r*) (f (map cdr r*))))))))
+      (define match-each
+        (lambda (p)
+          (with-syntax ([matcher (match p)])
+            #'(lambda (e)
+                (let f ([e e])
+                  (cond
+                    [(pair? e)
+                     (let ([first (matcher (car e) '())])
+                       (and first
+                            (let ([rest (f (cdr e))])
+                              (and rest (cons first rest)))))]
+                    [(null? e) '()]
+                    [else #f]))))))
+      (define match-each+
+        (lambda (p1 p2 p3)
+          (with-syntax ([(p2* ...) p2])
+            (with-syntax ([matcher-p1 (match p1)]
+                          [(matcher-p2* ...) (map match #'(p2* ...))]
+                          [matcher-p3 (match p3)])
+              #'(lambda (e r)
+                  (let f ([e e])
+                    (cond
+                      [(pair? e)
+                       (let-values ([(xr* y-pat r) (f (cdr e))])
+                         (if r
+                             (if (null? y-pat)
+                                 (let ([xr (matcher-p1 (car e) '())])
+                                   (if xr
+                                       (values (cons xr xr*) y-pat r)
+                                       (values #f #f #f)))
+                                 (values '() (cdr y-pat) ((car y-pat) (car e) r)))
+                             (values #f #f #f)))]
+                      [else (values '() (list matcher-p2* ...) (matcher-p3 e r))])))))))
+      (define match-empty
+        (lambda (p)
+          (syntax-case p (any each-any each each+)
+            [() #'(lambda (r) r)]
+            [any #`(lambda (r) (cons '() r))]
+            [(a . d)
+             (with-syntax ([matcher-a (match-empty #'a)]
+                           [matcher-d (match-empty #'d)])
+               #'(lambda (r) (matcher-a (matcher-d r))))]
+            [#(each p) (match-empty #'p)]
+            [#(each+ p1 (p2 ...) p3)
+             (with-syntax ([matcher-p1 (match-empty #'p1)]
+                           [matcher-p2 (match-empty (reverse #'(p2 ...)))]
+                           [matcher-p3 (match-empty #'p3)])
+               #'(lambda (r) (matcher-p1 (matcher-p2 (matcher-p3 r)))))])))
+      (define match*
+        (lambda (p)
+          (syntax-case p (any each-any each each+)
+            [() #'(lambda (e r) (and (null? e) r))]
+            [(a . d)
+             (with-syntax ([matcher-a (match #'a)]
+                           [matcher-d (match #'d)])
+               #'(lambda (e r)
+                   (and (pair? e)
+                        (matcher-a (car e)
+                          (matcher-d (cdr e) r)))))]
+            [each-any #'(lambda (e r) (and (list? e) (cons e r)))]
+            [#(each p)
+             (with-syntax ([matcher-empty (match-empty #'p)]
+                           [matcher-each (match-each #'p)]
+                           [combine (combiner)])
+               #'(lambda (e r)
+                   (if (null? e)
+                       (matcher-empty r)
+                       (let ([r* (matcher-each e)])
+                         (and r* (combine r* r))))))]
+            [#(each+ p1 p2 p3)
+             (with-syntax ([matcher-each+ (match-each+ #'p1 #'p2 #'p3)]
+                           [matcher-empty (match-empty #'p1)]
+                           [combine (combiner)])
+               #'(lambda (e r)
+                   (let-values ([(r* y-pat r) (matcher-each+ e r)])
+                     (and r (null? y-pat)
+                          (if (null? r*)
+                              (matcher-empty r)
+                              (combine r* r))))))])))
+      (define match
+        (lambda (p)
+          (syntax-case p (any)
+            [any #'(lambda (e r) (and r (cons e r)))]
+            [_ (with-syntax ([matcher (match* p)])
+                 #'(lambda (e r) (and r (matcher e r))))])))
+      (syntax-case x (any)
+        [(_ ?e p)
+         (with-syntax ([matcher (match #'p)])
+           #`(matcher ?e '()))])))
+)

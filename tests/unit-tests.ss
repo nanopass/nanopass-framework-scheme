@@ -59,6 +59,8 @@
       (primapp pr e1 ...)                          => (pr e1 ...)
       (app e0 e1 ...)                              => (e0 e1 ...)))
 
+  (define-parser parse-LUNPARSE LUNPARSE)
+
   (define-language LBool
     (terminals
       (boolean (b)))
@@ -213,6 +215,54 @@
              (f.7 '10))
           (unparse-LUNPARSE
             (with-output-language (LUNPARSE Expr)
+              `(recbinding
+                 (,zero?.5 ,*.6 ,f.7)
+                 ((lambda (,x.1) (primapp = (var ,x.1) (quoted 0)))
+                  (lambda (,x.2 ,y.3)
+                    (if (app (var ,zero?.5) (var ,x.2))
+                        (quoted 0)
+                        (if (primapp = (var ,x.2) (quoted 1))
+                            (var ,y.3)
+                            (primapp + (var ,y.3)
+                              (app (var ,*.6)
+                                   (primapp - (var ,x.2) (quoted 1))
+                                   (var ,y.3))))))
+                  (lambda (,x.4)
+                    (if (app (var ,zero?.5) (var ,x.4))
+                        (quoted 1)
+                        (app (var ,*.6) (var ,x.4)
+                             (app (var ,f.7)
+                                  (primapp - (var ,x.4) (quoted 1)))))))
+                 (app (var ,f.7) (quoted 10)))) #f)))
+      )
+
+    (test parse-language
+      (assert-equal? '(quote 7) (unparse-LUNPARSE (parse-LUNPARSE '(quoted 7))))
+      (let ([x.1 (make-var 'x.1)])
+        (assert-equal? 'x.1 (unparse-LUNPARSE (parse-LUNPARSE `(var ,x.1)))))
+      (assert-equal? '(begin '10 '17) (unparse-LUNPARSE (parse-LUNPARSE '(seq (quoted 10) (quoted 17)))))
+      (let ([x.1 (make-var 'x.1)]
+            [x.2 (make-var 'x.2)]
+            [y.3 (make-var 'y.3)]
+            [x.4 (make-var 'x.4)]
+            [zero?.5 (make-var 'zero?.5)]
+            [*.6 (make-var '*.6)]
+            [f.7 (make-var 'f.7)])
+        (assert-equal?
+          '(letrec ([zero?.5 (lambda (x.1) (= x.1 '0))]
+                    [*.6 (lambda (x.2 y.3)
+                           (if (zero?.5 x.2)
+                               '0
+                               (if (= x.2 '1)
+                                   y.3
+                                   (+ y.3 (*.6 (- x.2 '1) y.3)))))]
+                    [f.7 (lambda (x.4)
+                           (if (zero?.5 x.4)
+                               '1
+                               (*.6 x.4 (f.7 (- x.4 '1)))))])
+             (f.7 '10))
+          (unparse-LUNPARSE
+            (parse-LUNPARSE
               `(recbinding
                  (,zero?.5 ,*.6 ,f.7)
                  ((lambda (,x.1) (primapp = (var ,x.1) (quoted 0)))
@@ -867,11 +917,11 @@
    (test-suite error-messages
      (test run-time-error-messages
        (assert-error
-         (format-error-message "Exception in with-output-language: expected list of symbol but received x in field x* of (lambda (x* ...) body* ... body) from expression ~s at line 872, char 23 of ~a" ''x test-file)
+         (format-error-message "Exception in with-output-language: expected list of symbol but received x in field x* of (lambda (x* ...) body* ... body) from expression ~s at line 922, char 23 of ~a" ''x test-file)
          (with-output-language (L-error Expr)
            `(lambda (,'x ...) z)))
        (assert-error
-         (format-error-message "Exception in with-output-language: expected list of list of symbol but received x** in field x** of ~s from expression ~s at line 876, char 29 of ~a" '(let-values (((x** ...) e*) ...) body* ... body) ''x** test-file)
+         (format-error-message "Exception in with-output-language: expected list of list of symbol but received x** in field x** of ~s from expression ~s at line 926, char 29 of ~a" '(let-values (((x** ...) e*) ...) body* ... body) ''x** test-file)
          (with-output-language (L-error Expr)
            `(let-values ([(,'x** ...) ,'(y)] ...) z)))
        ))
