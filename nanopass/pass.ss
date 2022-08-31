@@ -432,6 +432,10 @@
                         fml* nrec*))))
                 (define (helper cl lhs guard rhs rhs*)
                   (let ([nano-meta (imeta-parser itype lhs #t)])
+                    (unless (nano-meta? nano-meta)
+                      (syntax-violation who
+                        (format "pattern ~s was not recognizd by meta-parser in" (syntax->datum lhs))
+                        cl))
                     (let ([fml* (nano-meta->fml* cl nano-meta)])
                       (unless (all-unique-identifiers? fml*)
                         (syntax-violation who "pattern binds one or more identifiers more then once" lhs))

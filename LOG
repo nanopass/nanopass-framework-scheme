@@ -841,3 +841,7 @@ LATEST
       nanopass/nano-syntax-dispatch.ss, tests/unit-tests.ss
   * Removed `any` and `every` since these were just `exist` and `for-all`.
       tests/helper.ss
+2022-08-30 -
+  * Added syntax-violation when parsing a clause pattern does not produce a
+    nanopass record decription.
+      nanopass/pass.ss
