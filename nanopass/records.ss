@@ -170,7 +170,28 @@
                               (cdr specs))))
                         (spec-meta-vars test-spec)))
                     (f (cdr specs)))))))
+          (define check-alts!
+            (let ()
+              (define (alt=? a1 a2)
+                (equal? (syntax->datum (alt-syn a1)) (syntax->datum (alt-syn a2))))
+              (lambda (lang-name ntspecs)
+                (for-each
+                  (lambda (ntspec)
+                    (let f ([alts (ntspec-alts ntspec)])
+                      (unless (null? alts)
+                        (let ([a (car alts)])
+                          (for-each
+                            (lambda (a2)
+                              (when (alt=? a a2)
+                                (syntax-violation 'define-language
+                                  (format "the nonterminal ~s in language ~s lists the same production more than once"
+                                    (syntax->datum (ntspec-name ntspec)) (syntax->datum lang-name))
+                                  (alt-syn a))))
+                            (cdr alts)))
+                        (f (cdr alts)))))
+                  ntspecs))))
           (check-meta! name tspecs ntspecs)
+          (check-alts! name ntspecs)
           (new name entry-ntspec tspecs ntspecs #f #f #f nongen-id)))))
 
   (define-record-type tspec

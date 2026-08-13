@@ -6,7 +6,7 @@
     run-maybe-dots-tests run-language-dot-support run-maybe-unparse-tests
     run-argument-name-matching run-error-messages run-pass-parser-unparser
     run-parser-regression)
-  (import (rnrs)
+  (import (rnrs) (rnrs eval)
           (nanopass helpers)
           (nanopass language)
           (nanopass pass)
@@ -925,6 +925,17 @@
          (format-error-message "Exception in with-output-language: expected list of list of symbol but received x** in field x** of ~s from expression ~s at line 927, char 29 of ~a" '(let-values (((x** ...) e*) ...) body* ... body) ''x** test-file)
          (with-output-language (L-error Expr)
            `(let-values ([(,'x** ...) ,'(y)] ...) z)))
+       ;; regression test for github issue #12: listing the same production
+       ;; twice under one nonterminal should raise an error instead of being
+       ;; silently accepted.
+       (assert-error
+         "Exception in define-language: the nonterminal Expr in language L-duplicate-alt lists the same production more than once (const n)"
+         (eval '(define-language L-duplicate-alt
+                  (terminals (number (n)))
+                  (Expr (e)
+                    (const n)
+                    (const n)))
+           (environment '(nanopass))))
        ))
 
    ;; regression test for error reported by R. Kent Dybvig:
